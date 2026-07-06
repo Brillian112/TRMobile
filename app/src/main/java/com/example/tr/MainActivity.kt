@@ -14,8 +14,11 @@ import com.example.tr.uitr.navigation.Screen
 import com.example.tr.uitr.screens.DashboardScreen
 import com.example.tr.uitr.screens.LoginScreen
 import com.example.tr.ui.theme.TRTheme
+import com.example.tr.uitr.screens.DashboardKasirScreen
 import com.example.tr.uitr.screens.KelolaKaryawanScreen
 import com.example.tr.uitr.screens.KelolaMenuScreen
+import com.example.tr.uitr.screens.PembayaranScreen
+import com.example.tr.uitr.screens.TransaksiBaruScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,14 +35,30 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Login.route) {
                             LoginScreen(navController)
                         }
-                        composable(Screen.Dashboard.route) {
+                        composable(Screen.DashboardManager.route) {
                             DashboardScreen(navController)
                         }
+
+
                         composable(Screen.Menu.route) {
                             KelolaMenuScreen(navController)
                         }
                         composable(Screen.Karyawan.route) {
                             KelolaKaryawanScreen(navController)
+                        }
+
+                        //karyawan
+                        // Tambahkan di dalam NavHost {} bersama rute lainnya:
+                        composable(Screen.TransaksiBaru.route) {
+                            TransaksiBaruScreen(navController = navController)
+                        }
+
+                        composable(Screen.DashboardKasir.route) {
+                            DashboardKasirScreen(navController = navController)
+                        }
+
+                        composable(Screen.Pembayaran.route) {
+                            PembayaranScreen(navController = navController)
                         }
                         // Layar lainnya akan ditambahkan di sini
                     }

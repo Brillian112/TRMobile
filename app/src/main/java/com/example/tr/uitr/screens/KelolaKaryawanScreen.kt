@@ -157,7 +157,7 @@ fun KelolaKaryawanScreen(navController: NavController) {
                 if (selectedKaryawan == null) {
                     // Tambah Karyawan Baru
                     karyawanList.add(
-                        KaryawanData(id = UUID.randomUUID().toString(), nama = nama, peran = peran, status = status)
+                        KaryawanData(id = UUID.randomUUID().toString(), nama = nama, peran = peran, password = "password", status = status)
                     )
                 } else {
                     // Update Karyawan Lama

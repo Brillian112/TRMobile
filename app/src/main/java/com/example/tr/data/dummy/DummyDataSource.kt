@@ -30,8 +30,8 @@ object DummyDataSource {
     )
 
     val dummyKaryawanList = listOf(
-        KaryawanData(id = "1", nama = "Andi", peran = "Kasir", status = "Aktif"),
-        KaryawanData(id = "2", nama = "Siti", peran = "Kasir", status = "Aktif")
+        KaryawanData(id = "1", nama = "Andi", peran = "Kasir", password = "password", status = "Aktif"),
+        KaryawanData(id = "2", nama = "Siti", peran = "Kasir", password = "password", status = "Aktif")
     )
 
 }
