@@ -24,4 +24,8 @@ val IconBgColor = Color(0xFFEAF1FF) // Background biru muda untuk icon Akses Cep
 
 
 
+val GreenText = Color(0xFF047857) // Hijau teks
+val GreenBg = Color(0xFFD1FAE5) // Hijau badge
+val RedText = Color(0xFFB91C1C) // Merah teks
+val RedBg = Color(0xFFFEE2E2) // Merah badge
 

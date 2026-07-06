@@ -16,6 +16,7 @@ import com.example.tr.uitr.screens.LoginScreen
 import com.example.tr.ui.theme.TRTheme
 import com.example.tr.uitr.screens.KelolaKaryawanScreen
 import com.example.tr.uitr.screens.KelolaMenuScreen
+import com.example.tr.uitr.screens.RiwayatTransaksiScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +41,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.Karyawan.route) {
                             KelolaKaryawanScreen(navController)
+                        }
+                        composable(Screen.Transaksi.route) {
+                            RiwayatTransaksiScreen(navController)
                         }
                         // Layar lainnya akan ditambahkan di sini
                     }
