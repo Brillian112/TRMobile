@@ -23,14 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.tr.uitr.navigation.Screen
-
+import com.example.tr.data.model.MenuData
 // 1. Model Data untuk Menu
-data class MenuItem(
-    val id: Int,
-    val nama: String,
-    val harga: Int,
-    val kategori: String
-)
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,10 +38,10 @@ fun TransaksiBaruScreen(navController: NavController) {
 
     // Dummy Data Menu sesuai gambar mockup
     val daftarMenu = listOf(
-        MenuItem(1, "Nasi Goreng Spesial", 25000, "Makanan"),
-        MenuItem(2, "Es Kopi Susu Gula Aren", 18000, "Minuman"),
-        MenuItem(3, "Kentang Goreng", 15000, "Snack"),
-        MenuItem(4, "Mie Kuah Spesial", 22000, "Makanan")
+        MenuData("1", "Nasi Goreng Spesial", deskripsi = "mantap", 10000, kategori = "Makanan"),
+        MenuData("2", "Es Kopi Susu Gula Aren", deskripsi = "mantap", 10000, kategori = "Makanan"),
+        MenuData("3", "Kentang Goreng", deskripsi = "mantap", 10000, kategori = "Makanan"),
+        MenuData("4", "Mie Kuah Spesial", deskripsi = "mantap", 10000, kategori = "Makanan")
     )
 
     // Filter data berdasarkan search bar dan chip kategori
@@ -161,7 +156,7 @@ fun TransaksiBaruScreen(navController: NavController) {
 
 // 6. Komponen Card Item Menu
 @Composable
-fun ItemMenuCard(itemMenu: MenuItem, warnaTema: Color) {
+fun ItemMenuCard(itemMenu: MenuData, warnaTema: Color) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
