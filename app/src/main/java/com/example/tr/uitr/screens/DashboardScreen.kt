@@ -274,10 +274,10 @@ fun QuickAccessItem(
     icon: ImageVector,
     label: String,
     modifier: Modifier,
-    onClick: () -> Unit // Tambahkan parameter onClick
+    onClick: () -> Unit
 ) {
     Card(
-        onClick = onClick, // Terapkan aksi klik pada Card
+        onClick = onClick,
         modifier = modifier.height(110.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CardBg),

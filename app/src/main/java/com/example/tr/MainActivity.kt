@@ -14,6 +14,8 @@ import com.example.tr.uitr.navigation.Screen
 import com.example.tr.uitr.screens.DashboardScreen
 import com.example.tr.uitr.screens.LoginScreen
 import com.example.tr.ui.theme.TRTheme
+import com.example.tr.uitr.screens.DaftarHadirScreen
+import com.example.tr.uitr.screens.InventoriScreen
 import com.example.tr.uitr.screens.KelolaKaryawanScreen
 import com.example.tr.uitr.screens.KelolaMenuScreen
 import com.example.tr.uitr.screens.RiwayatTransaksiScreen
@@ -44,6 +46,12 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.Transaksi.route) {
                             RiwayatTransaksiScreen(navController)
+                        }
+                        composable(Screen.Presensi.route) {
+                            DaftarHadirScreen(navController)
+                        }
+                        composable(Screen.Inventori.route) {
+                            InventoriScreen(navController)
                         }
                         // Layar lainnya akan ditambahkan di sini
                     }
