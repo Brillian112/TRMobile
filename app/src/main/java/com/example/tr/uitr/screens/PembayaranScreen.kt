@@ -24,7 +24,11 @@ import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PembayaranScreen(navController: NavController) {
+fun PembayaranScreen(
+    navController: NavController,
+    // Callback untuk melempar nominal uang diterima dan kembalian ke NavHost/ViewModel
+    onTransaksiSelesai: (Int, Int) -> Unit
+) {
     val utamaHijau = Color(0xFF0F6E52)
     val bgLight = Color(0xFFF8F9FA)
     val textUtama = Color(0xFF0F6E52)
@@ -53,10 +57,20 @@ fun PembayaranScreen(navController: NavController) {
             // Tombol Selesaikan Transaksi di paling bawah
             Box(modifier = Modifier.padding(16.dp)) {
                 Button(
-                    onClick = { /* TODO: Aksi simpan transaksi & cetak struk */ },
-                    colors = ButtonDefaults.buttonColors(containerColor = utamaHijau),
+                    onClick = {
+                        // Memanggil callback navigasi sambil membawa data nominal
+                        onTransaksiSelesai(uangDiterima, kembalian)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = utamaHijau,
+                        disabledContainerColor = Color.LightGray
+                    ),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    // Tombol hanya aktif jika uang yang dimasukkan sudah cukup
+                    enabled = uangDiterima >= totalTagihan
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color.White)
@@ -91,7 +105,7 @@ fun PembayaranScreen(navController: NavController) {
                         Text("Total Tagihan", color = Color.Gray, fontSize = 14.sp)
                         Text("Rp $totalTagihan", color = textUtama, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     }
-                    Divider(color = Color(0xFFECEFF1))
+                    HorizontalDivider(color = Color(0xFFECEFF1))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Pelangan", color = Color.Gray, fontSize = 14.sp)
                         Text("Umum (-)", color = Color.DarkGray, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
@@ -153,7 +167,9 @@ fun PembayaranScreen(navController: NavController) {
                         columns = GridCells.Fixed(3),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth().height(220.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
                     ) {
                         items(tombolNumpad) { label ->
                             Box(
@@ -176,7 +192,9 @@ fun PembayaranScreen(navController: NavController) {
                                                 if (uangDiterimaText == "0") {
                                                     uangDiterimaText = label
                                                 } else {
-                                                    uangDiterimaText += label
+                                                    if (uangDiterimaText.length < 9) { // Proteksi digit berlebih
+                                                        uangDiterimaText += label
+                                                    }
                                                 }
                                             }
                                         }
@@ -201,7 +219,9 @@ fun PembayaranScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("KEMBALIAN", color = utamaHijau, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)

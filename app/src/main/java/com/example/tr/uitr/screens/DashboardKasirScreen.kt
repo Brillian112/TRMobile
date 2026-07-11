@@ -24,18 +24,12 @@ import com.example.tr.uitr.navigation.Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardKasirScreen(navController: NavController) {
-    val utamaHijau = Color(0xFF0F6E52) // Warna sesuai mockup kamu
+    val utamaHijau = Color(0xFF0F6E52)
     val bgLight = Color(0xFFF8F9FA)
 
-    // State untuk Bottom Navigation yang aktif (0 = Beranda)
-    var selectedItem by remember { mutableStateOf(0) }
-
     Scaffold(
-        containerColor = bgLight,
-        bottomBar = {
-            // Cukup panggil seperti ini, beres!
-            DashboardBottomNav(navController = navController, selectedItem = 0)
-        }
+        containerColor = bgLight
+        // UPDATE: bottomBar bawaan lama dihapus dari sini karena sudah ditangani secara global oleh MainActivity.kt
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -57,7 +51,6 @@ fun DashboardKasirScreen(navController: NavController) {
             }
 
             // 4. BAGIAN TOMBOL MENU UTAMA (Transaksi Baru & Riwayat)
-            // Di dalam LazyColumn, pastikan saat memanggil MenuUtamaSection kodenya seperti ini:
             item {
                 MenuUtamaSection(warnaTema = utamaHijau, navController = navController)
             }
@@ -106,7 +99,6 @@ fun HeaderSection(warnaTema: Color) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Avatar bulat abu-abu sebagai placeholder foto
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -120,7 +112,6 @@ fun HeaderSection(warnaTema: Color) {
                 color = warnaTema
             )
         }
-        // Tombol Lonceng Notifikasi
         Icon(
             imageVector = Icons.Outlined.Notifications,
             contentDescription = "Notifikasi",
@@ -150,7 +141,6 @@ fun ShiftCardSection(warnaTema: Color) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Sub-container hijau untuk status kehadiran
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -165,7 +155,6 @@ fun ShiftCardSection(warnaTema: Color) {
                         Text("Status Kehadiran", color = Color.White, fontSize = 14.sp)
                     }
                     Spacer(modifier = Modifier.height(6.dp))
-                    // Badge Putih Transparan
                     Surface(
                         color = Color.White.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(20.dp)
@@ -194,10 +183,7 @@ fun MenuUtamaSection(warnaTema: Color, navController: NavController) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable {
-                    // Tambahkan baris print ini untuk tes apakah tombolnya benar-benar merespons klik
                     println("TES_KLIK: Tombol Transaksi Baru Berhasil Ditekan!")
-
-                    // Perintah pindah halaman
                     navController.navigate(Screen.TransaksiBaru.route)
                 }
         ) {
@@ -218,7 +204,6 @@ fun MenuUtamaSection(warnaTema: Color, navController: NavController) {
                     Text("Buat Transaksi Baru", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Text("Mulai proses kasir untuk pelanggan", fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
                 }
-                // Placeholder Ikon Mesin Kasir Besar di Kanan (Bisa menggunakan Icon bawaan)
                 Icon(Icons.Outlined.PointOfSale, contentDescription = null, tint = Color.White.copy(alpha = 0.15f), modifier = Modifier.size(70.dp))
             }
         }
@@ -232,7 +217,10 @@ fun MenuUtamaSection(warnaTema: Color, navController: NavController) {
             border = BorderStroke(1.dp, warnaTema),
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { navController.navigate(Screen.TransaksiBaru.route) }
+                .clickable {
+                    // Tombol ini sekarang mengarah ke halaman transaksi riwayat dengan mulus
+                    navController.navigate(Screen.Riwayat.route)
+                }
         ) {
             Row(
                 modifier = Modifier.padding(20.dp).fillMaxWidth(),
@@ -286,54 +274,6 @@ fun RingkasanItem(
                 Text(judul, fontSize = 12.sp, color = Color.Gray)
                 Text(nilai, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
             }
-        }
-    }
-}
-
-@Composable
-fun DashboardBottomNav(navController: NavController, selectedItem: Int) { // <-- Tambahkan parameter navController di sini
-    NavigationBar(
-        containerColor = Color.White,
-        tonalElevation = 8.dp
-    ) {
-        // Nama menu dan ikonnya
-        val items = listOf("Beranda", "Transaksi", "Absensi", "Profil")
-        val icons = listOf(Icons.Filled.Home, Icons.Outlined.Receipt, Icons.Outlined.AssignmentInd, Icons.Outlined.Person)
-
-        // Sesuaikan rute halaman dengan object yang ada di Screen.kt kamu
-        val routes = listOf(
-            Screen.DashboardKasir.route,  // Index 0: Beranda Kasir
-            Screen.TransaksiBaru.route,   // Index 1: Transaksi Baru
-            Screen.DashboardKasir.route,  // Index 2: Absensi (Arahkan sementara ke Beranda jika belum ada)
-            Screen.DashboardKasir.route   // Index 3: Profil (Arahkan sementara ke Beranda jika belum ada)
-        )
-
-        items.forEachIndexed { index, item ->
-            NavigationBarItem(
-                icon = { Icon(icons[index], contentDescription = item) },
-                label = { Text(item, fontSize = 11.sp) },
-                selected = selectedItem == index,
-                onClick = {
-                    // Logika berpindah halaman saat ikon navbar diklik
-                    if (selectedItem != index) {
-                        navController.navigate(routes[index]) {
-                            // Agar ketika tombol back ditekan, tidak menumpuk halaman berulang kali
-                            popUpTo(Screen.DashboardKasir.route) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color(0xFF0F6E52),
-                    indicatorColor = Color(0xFF0F6E52), // Warna background bulat saat aktif
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray
-                )
-            )
         }
     }
 }
