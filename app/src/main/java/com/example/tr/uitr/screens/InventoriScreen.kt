@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tr.data.remote.model.Ingredient
-import com.example.tr.data.remote.model.IngredientRequest
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.tr.uitr.components.AppDrawer
 import com.example.tr.uitr.viewmodel.IngredientViewModel
@@ -62,18 +61,18 @@ fun InventoriScreen(
     var showFormDialog by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<Ingredient?>(null) }
 
+    // 🔴 State baru untuk menyimpan item yang akan dihapus (sebagai pemicu dialog konfirmasi)
+    var itemToDelete by remember { mutableStateOf<Ingredient?>(null) }
+
     val filteredList = ingredients.filter { item ->
-        val status = when {
-            item.stockQuantity <= 0.0 -> "Habis"
-            item.stockQuantity <= 5.0 -> "Stok Rendah"
-            else -> "Cukup"
-        }
+        val stock = item.stockQuantity ?: 0.0
+        val name = item.name ?: ""
         val matchFilter = when (selectedFilter) {
-            "Stok Rendah" -> status == "Stok Rendah"
-            "Habis" -> status == "Habis"
+            "Stok Rendah" -> (stock > 0.0 && stock <= 5.0)
+            "Habis" -> stock <= 0.0
             else -> true
         }
-        matchFilter && item.name.contains(searchQuery, ignoreCase = true)
+        matchFilter && name.contains(searchQuery, ignoreCase = true)
     }
 
     val navBackStackEntry = navController.currentBackStackEntryAsState()
@@ -87,9 +86,7 @@ fun InventoriScreen(
         drawerContent = {
             AppDrawer(
                 navController = navController,
-
                 currentRoute = currentRoute,
-
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }
@@ -171,6 +168,10 @@ fun InventoriScreen(
                             onEditClick = {
                                 selectedItem = ingredient
                                 showFormDialog = true
+                            },
+                            onDeleteClick = {
+                                // 🔴 Jangan langsung hapus, set itemToDelete dulu agar dialog muncul
+                                itemToDelete = ingredient
                             }
                         )
                     }
@@ -181,32 +182,63 @@ fun InventoriScreen(
         }
     }
 
+    // --- DIALOG UNTUK FORM TAMBAH / EDIT ---
     if (showFormDialog) {
+        val context = LocalContext.current
+
         FormInventoriDialog(
             item = selectedItem,
             onDismiss = { showFormDialog = false },
             onSave = { name, quantity, unit, imageUri ->
-                // CATATAN PENTING:
-                // Karena API meminta File (multipart), kamu harus mengubah fungsi di ViewModel
-                // agar bisa menerima 'imageUri' dan mengubahnya menjadi MultipartBody.Part
-
-                // Untuk sementara, jika ViewModel belum diupdate, kodenya seperti ini:
-                val request = IngredientRequest(name, quantity, unit, imageUri?.toString())
                 if (selectedItem == null) {
-                    viewModel.createIngredient(request) // Idealnya: viewModel.createIngredient(name, quantity, unit, imageUri, context)
+                    viewModel.createIngredient(
+                        context = context,
+                        name = name,
+                        quantity = quantity,
+                        unit = unit,
+                        imageUri = imageUri
+                    )
                 } else {
-                    viewModel.updateIngredient(selectedItem!!.id, request)
+                    viewModel.updateIngredient(
+                        context = context,
+                        id = selectedItem!!.id,
+                        name = name,
+                        quantity = quantity,
+                        unit = unit,
+                        imageUri = imageUri,
+                        currentImageUrl = selectedItem!!.imageUrl
+                    )
                 }
                 showFormDialog = false
             }
         )
     }
-}
 
-
-@Composable
-fun TopBarInventori() {
-    // Deprecated
+    // 🔴 --- DIALOG KONFIRMASI HAPUS (YA / TIDAK) ---
+    if (itemToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = { Text("Hapus Bahan Baku", fontWeight = FontWeight.Bold) },
+            text = { Text("Apakah Anda yakin ingin menghapus '${itemToDelete?.name}' dari inventori?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Jalankan fungsi hapus yang sesungguhnya
+                        viewModel.deleteIngredient(itemToDelete!!.id)
+                        itemToDelete = null // Tutup dialog
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RedText) // Tombol "Ya" warna merah
+                ) {
+                    Text("Ya, Hapus")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text("Batal", color = TextGray)
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -229,18 +261,25 @@ fun FilterChipInventori(title: String, isSelected: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-fun InventoriCardItem(ingredient: Ingredient, onEditClick: () -> Unit) {
+fun InventoriCardItem(
+    ingredient: Ingredient,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val stock = ingredient.stockQuantity ?: 0.0
+    val name = ingredient.name ?: "Tanpa Nama"
+    val unit = ingredient.unit ?: ""
     val status = when {
-        ingredient.stockQuantity <= 0.0 -> "Habis"
-        ingredient.stockQuantity <= 5.0 -> "Rendah"
+        stock <= 0.0 -> "Habis"
+        stock <= 5.0 -> "Rendah"
         else -> "Cukup"
     }
     val isHabis = status == "Habis"
 
-    val formattedJumlah = if (ingredient.stockQuantity % 1.0 == 0.0) {
-        ingredient.stockQuantity.toInt().toString()
+    val formattedJumlah = if (stock % 1.0 == 0.0) {
+        stock.toInt().toString()
     } else {
-        ingredient.stockQuantity.toString()
+        stock.toString()
     }
 
     Card(
@@ -258,7 +297,7 @@ fun InventoriCardItem(ingredient: Ingredient, onEditClick: () -> Unit) {
                             .data(ingredient.imageUrl)
                             .crossfade(true)
                             .build(),
-                        contentDescription = "Gambar ${ingredient.name}",
+                        contentDescription = "Gambar $name",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(48.dp)
@@ -279,11 +318,11 @@ fun InventoriCardItem(ingredient: Ingredient, onEditClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text(text = ingredient.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkNavy)
+                Text(text = name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkNavy)
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "$formattedJumlah ${ingredient.unit}",
+                    text = "$formattedJumlah $unit",
                     fontSize = 13.sp,
                     color = if (isHabis) RedText else TextGray,
                     fontWeight = if (isHabis) FontWeight.Bold else FontWeight.Normal
@@ -294,15 +333,28 @@ fun InventoriCardItem(ingredient: Ingredient, onEditClick: () -> Unit) {
                 StatusBadge(status = status)
             }
 
-            Icon(
-                imageVector = Icons.Outlined.Edit,
-                contentDescription = "Edit",
-                tint = DarkNavy,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(20.dp)
-                    .clickable { onEditClick() }
-            )
+            Row(
+                modifier = Modifier.align(Alignment.TopEnd),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = "Edit",
+                    tint = DarkNavy,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable { onEditClick() }
+                )
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = "Delete",
+                    tint = RedText,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable { onDeleteClick() }
+                )
+            }
         }
     }
 }
@@ -312,16 +364,14 @@ fun InventoriCardItem(ingredient: Ingredient, onEditClick: () -> Unit) {
 fun FormInventoriDialog(
     item: Ingredient?,
     onDismiss: () -> Unit,
-    onSave: (String, Double, String, Uri?) -> Unit // <-- Tambahkan parameter Uri?
+    onSave: (String, Double, String, Uri?) -> Unit
 ) {
     var nama by remember { mutableStateOf(item?.name ?: "") }
     var jumlahInput by remember { mutableStateOf(item?.stockQuantity?.toString() ?: "") }
     var satuan by remember { mutableStateOf(item?.unit ?: "kg") }
 
-    // State untuk menyimpan URI gambar yang dipilih dari galeri
     var imageUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Launcher untuk membuka Galeri HP
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -333,19 +383,16 @@ fun FormInventoriDialog(
         title = { Text(if (item == null) "Tambah Item" else "Edit Item", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
-                // --- KOTAK PEMILIH GAMBAR ---
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFFE2E8F0))
-                        .clickable { launcher.launch("image/*") }, // Buka galeri saat diklik
+                        .clickable { launcher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
                     if (imageUri != null) {
-                        // Tampilkan preview gambar yang baru dipilih
                         AsyncImage(
                             model = imageUri,
                             contentDescription = "Selected Image",
@@ -353,7 +400,6 @@ fun FormInventoriDialog(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else if (!item?.imageUrl.isNullOrEmpty()) {
-                        // Tampilkan gambar lama jika sedang mode Edit
                         AsyncImage(
                             model = item!!.imageUrl,
                             contentDescription = "Current Image",
@@ -361,7 +407,6 @@ fun FormInventoriDialog(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        // Placeholder jika belum ada gambar
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Pick Image", tint = TextGray, modifier = Modifier.size(32.dp))
                             Spacer(modifier = Modifier.height(8.dp))
@@ -397,7 +442,6 @@ fun FormInventoriDialog(
             Button(
                 onClick = {
                     val jumlah = jumlahInput.toDoubleOrNull() ?: 0.0
-                    // Validasi: pastikan nama terisi (gambar idealnya juga divalidasi jika wajib)
                     if (nama.isNotBlank()) {
                         onSave(nama, jumlah, satuan, imageUri)
                     }

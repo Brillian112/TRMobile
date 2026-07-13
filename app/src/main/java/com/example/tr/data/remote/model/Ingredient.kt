@@ -4,18 +4,18 @@ import com.google.gson.annotations.SerializedName
 
 data class Ingredient(
     val id: Long,
-    val name: String,
-    @SerializedName("stock_quantity") val stockQuantity: Double,
-    val unit: String,
+    @SerializedName(value = "nama", alternate = ["name"]) val name: String?,
+    @SerializedName(value = "stok", alternate = ["stock_quantity"]) val stockQuantity: Double?,
+    @SerializedName(value = "satuan", alternate = ["unit"]) val unit: String?,
     @SerializedName("image_url") val imageUrl: String?,
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("updated_at") val updatedAt: String?
 )
 
 data class IngredientRequest(
-    val name: String,
-    @SerializedName("stock_quantity") val stockQuantity: Double,
-    val unit: String,
+    @SerializedName("nama") val name: String,
+    @SerializedName("stok") val stockQuantity: Double,
+    @SerializedName("satuan") val unit: String,
     @SerializedName("image_url") val imageUrl: String?
 )
 

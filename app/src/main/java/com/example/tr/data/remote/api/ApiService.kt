@@ -3,6 +3,10 @@ package com.example.tr.data.remote.api
 import com.example.tr.data.remote.model.*
 import retrofit2.Response
 import retrofit2.http.*
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+
+
 
 interface ApiService {
     // Authentication
@@ -67,14 +71,38 @@ interface ApiService {
     @GET("api/ingredients")
     suspend fun getIngredients(): IngredientResponse
 
-    @GET("api/ingredients/{id}")
-    suspend fun getIngredientById(@Path("id") id: Long): SingleIngredientResponse
-
+    @Multipart
     @POST("api/ingredients")
-    suspend fun createIngredient(@Body request: IngredientRequest): SingleIngredientResponse
+    suspend fun createIngredient(
+        @Part name: MultipartBody.Part,
+        @Part unit: MultipartBody.Part,
+        @Part quantity: MultipartBody.Part,
+        @Part gambar: MultipartBody.Part?
+    ): SingleIngredientResponse
+
+    @Multipart
+    @PUT("api/ingredients/{id}")
+    suspend fun updateIngredient(
+        @Path("id") id: Long,
+        @Part method: MultipartBody.Part,
+        @Part name: MultipartBody.Part,
+        @Part unit: MultipartBody.Part,
+        @Part quantity: MultipartBody.Part,
+        @Part gambar: MultipartBody.Part // 🔴 Selalu kirim part ini (tidak boleh null)
+    ): SingleIngredientResponse
 
     @PUT("api/ingredients/{id}")
-    suspend fun updateIngredient(@Path("id") id: Long, @Body request: IngredientRequest): SingleIngredientResponse
+    suspend fun updateIngredientJson(
+        @Path("id") id: Long,
+        @Body request: UpdateIngredientTextRequest
+    ): SingleIngredientResponse
+
+    // Data class pembungkus payload JSON (Sesuaikan tipe data stok ke Double/Int sesuai backend)
+    data class UpdateIngredientTextRequest(
+        val nama: String,
+        val unit: String,
+        val stok: String
+    )
 
     @DELETE("api/ingredients/{id}")
     suspend fun deleteIngredient(@Path("id") id: Long): Response<Unit>
