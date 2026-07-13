@@ -23,8 +23,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.tr.data.dummy.DummyDataSource
-import com.example.tr.data.model.TransaksiData
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.tr.uitr.components.AppDrawer
+import com.example.tr.uitr.components.StatusBadge
+import com.example.tr.uitr.navigation.Screen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.tr.data.remote.model.Transaction
+import com.example.tr.uitr.viewmodel.TransactionViewModel
 import com.example.tr.ui.theme.BgLight
 import com.example.tr.ui.theme.DarkNavy
 import com.example.tr.ui.theme.TextGray
@@ -32,169 +37,154 @@ import com.example.tr.ui.theme.GreenBg
 import com.example.tr.ui.theme.GreenText
 import com.example.tr.ui.theme.RedBg
 import com.example.tr.ui.theme.RedText
+import com.example.tr.ui.theme.YellowBg
+import com.example.tr.ui.theme.YellowText
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RiwayatTransaksiScreen(navController: NavController) {
-    // STATE MANAGEMENT LOKAL
-    val transaksiList = remember { mutableStateListOf(*DummyDataSource.dummyTransaksiList.toTypedArray()) }
+fun RiwayatTransaksiScreen(navController: NavController, viewModel: TransactionViewModel = viewModel()) {
+    // STATE MANAGEMENT FROM VIEWMODEL
+    val transactions = viewModel.transactions
     var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("Hari Ini") }
-    val filters = listOf("Hari Ini", "Minggu Ini", "Bulan Ini")
+    var selectedFilter by remember { mutableStateOf("Semua") }
+    val filters = listOf("Semua", "Pending", "completed", "Batal")
 
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var selectedTransaksi by remember { mutableStateOf<TransaksiData?>(null) }
+    var selectedTransaction by remember { mutableStateOf<Transaction?>(null) }
 
-    // Logika Filter (Berdasarkan rentang waktu dan pencarian ID invoice)
-    val filteredList = transaksiList.filter {
-        it.rentangWaktu == selectedFilter &&
-                it.invoice.contains(searchQuery, ignoreCase = true)
-    }
-
-    // Kalkulasi Total Pendapatan dinamis (hanya yang statusnya "Selesai")
-    val totalPendapatan = filteredList
-        .filter { it.status == "Selesai" }
-        .sumOf { it.totalHarga }
-
-    Scaffold(
-        containerColor = BgLight,
-        topBar = { TopBarTransaksi() },
-        bottomBar = { LaporanBottomNav(navController) }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
-
-            item {
-                Text(
-                    text = "Riwayat Transaksi",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkNavy
-                )
-            }
-
-            // Card Total Pendapatan
-            item {
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = "Total Pendapatan $selectedFilter",
-                            color = TextGray,
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Rp ${NumberFormat.getNumberInstance(Locale("id", "ID")).format(totalPendapatan)}",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = DarkNavy
-                        )
-                    }
-                }
-            }
-
-            // Search Bar
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Cari transaksi...", color = TextGray, fontSize = 14.sp) },
-                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
-                    shape = RoundedCornerShape(12.dp),
-//                    colors = TextFieldDefaults.outlinedTextFieldColors(
-//                        containerColor = Color.White,
-//                        unfocusedBorderColor = Color(0xFFE2E8F0),
-//                        focusedBorderColor = DarkNavy
-//                    ),
-                    modifier = Modifier.fillMaxWidth().height(56.dp)
-                )
-            }
-
-            // Filter Chips
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(filters) { filter ->
-                        FilterChipTransaksi(
-                            title = filter,
-                            isSelected = filter == selectedFilter,
-                            onClick = { selectedFilter = filter }
-                        )
-                    }
-                }
-            }
-
-            // List Transaksi
-            items(filteredList) { transaksi ->
-                TransaksiCardItem(
-                    transaksi = transaksi,
-                    onDeleteClick = {
-                        selectedTransaksi = transaksi
-                        showDeleteDialog = true
-                    }
-                )
-            }
-
-            item { Spacer(modifier = Modifier.height(16.dp)) }
+    // Logika Filter (Berdasarkan status dan pencarian ID)
+    val filteredList = transactions.filter {
+        val matchesFilter = when (selectedFilter) {
+            "Semua" -> true
+            "completed" -> it.status.equals("completed", ignoreCase = true) || it.status.equals("Berhasil", ignoreCase = true)
+            else -> it.status.equals(selectedFilter, ignoreCase = true)
         }
+        val matchesSearch = it.id.toString().contains(searchQuery, ignoreCase = true) || (it.user?.name?.contains(searchQuery, ignoreCase = true) ?: false)
+        matchesFilter && matchesSearch
     }
 
-    // Dialog Konfirmasi Hapus
-    if (showDeleteDialog && selectedTransaksi != null) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Hapus Transaksi", fontWeight = FontWeight.Bold) },
-            text = { Text("Hapus data transaksi ${selectedTransaksi?.invoice}? Data ini akan hilang dari laporan.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        transaksiList.removeIf { it.id == selectedTransaksi?.id }
-                        showDeleteDialog = false
-                    }
-                ) { Text("Hapus", color = Color.Red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Batal") }
+    // Kalkulasi Total Pendapatan dari SEMUA transaksi yang sudah selesai (bukan hanya yang difilter)
+    val totalPendapatan = transactions
+        .filter { it.status.equals("completed", ignoreCase = true) || it.status.equals("Berhasil", ignoreCase = true) }
+        .sumOf { it.totalAmount }
+
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
+                navController = navController,
+                currentRoute = currentRoute,
+                onCloseDrawer = { scope.launch { drawerState.close() } }
+            )
+        }
+    ) {
+        Scaffold(
+            containerColor = BgLight,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Riwayat Transaksi", fontWeight = FontWeight.Bold, color = DarkNavy) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = DarkNavy)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BgLight)
+                )
             }
-        )
+        ) { paddingValues ->
+            if (viewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                    // Card Total Pendapatan
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Text(
+                                    text = "Total Pendapatan ($selectedFilter)",
+                                    color = TextGray,
+                                    fontSize = 13.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Rp ${NumberFormat.getNumberInstance(Locale("id", "ID")).format(totalPendapatan)}",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DarkNavy
+                                )
+                            }
+                        }
+                    }
+
+                    // Search Bar
+                    item {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Cari transaksi (ID / Nama)...", color = TextGray, fontSize = 14.sp) },
+                            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                        )
+                    }
+
+                    // Filter Chips
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(filters) { filter ->
+                                FilterChipTransaksi(
+                                    title = filter,
+                                    isSelected = filter == selectedFilter,
+                                    onClick = { selectedFilter = filter }
+                                )
+                            }
+                        }
+                    }
+
+                    // List Transaksi
+                    items(filteredList) { transaction ->
+                        TransactionCardItem(
+                            transaction = transaction,
+                            onUpdateStatus = { newStatus ->
+                                viewModel.updateStatus(transaction.id, newStatus)
+                            }
+                        )
+                    }
+
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun TopBarTransaksi() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.LightGray),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Person, contentDescription = "Profil", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text("KasirKu", color = DarkNavy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
-        Icon(Icons.Outlined.Notifications, contentDescription = "Notifikasi", tint = DarkNavy)
-    }
+    // Deprecated in favor of Scaffold TopBar
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -217,8 +207,10 @@ fun FilterChipTransaksi(title: String, isSelected: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-fun TransaksiCardItem(transaksi: TransaksiData, onDeleteClick: () -> Unit) {
-    val isSelesai = transaksi.status == "Selesai"
+fun TransactionCardItem(transaction: Transaction, onUpdateStatus: (String) -> Unit) {
+    val status = transaction.status.lowercase()
+    val isSelesai = status == "completed" || status == "berhasil"
+    val isPending = status == "pending"
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -228,43 +220,45 @@ fun TransaksiCardItem(transaksi: TransaksiData, onDeleteClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header Card: Invoice, Status, & Tombol Hapus
+            // Header Card: ID, Status, & Aksi
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = transaksi.invoice, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkNavy)
+                    Text(text = "TX-${transaction.id}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = DarkNavy)
                     Spacer(modifier = Modifier.width(8.dp))
 
                     // Badge Status
-                    Surface(
-                        color = if (isSelesai) GreenBg else RedBg,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = transaksi.status,
-                            color = if (isSelesai) GreenText else RedText,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
+                    StatusBadge(status = transaction.status)
                 }
 
-                // Icon Hapus
-                Icon(
-                    imageVector = Icons.Outlined.DeleteOutline,
-                    contentDescription = "Hapus",
-                    tint = RedText,
-                    modifier = Modifier.size(20.dp).clickable { onDeleteClick() }
-                )
+                if (isPending) {
+                    Row {
+                        IconButton(
+                            onClick = { 
+                                // update database ke status completed
+                                onUpdateStatus("completed")
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = "Selesaikan", tint = GreenText)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { onUpdateStatus("Batal") },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "Batalkan", tint = RedText)
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${transaksi.namaKasir} - ${transaksi.jumlahItem} items",
+                text = "${transaction.user?.name ?: "Unknown"} - ${transaction.paymentMethod}",
                 color = TextGray,
                 fontSize = 12.sp
             )
@@ -282,52 +276,13 @@ fun TransaksiCardItem(transaksi: TransaksiData, onDeleteClick: () -> Unit) {
                 Text(text = "Total", color = TextGray, fontSize = 13.sp)
 
                 Text(
-                    text = "Rp ${NumberFormat.getNumberInstance(Locale("id", "ID")).format(transaksi.totalHarga)}",
-                    color = if (isSelesai) GreenText else RedText,
+                    text = "Rp ${NumberFormat.getNumberInstance(Locale("id", "ID")).format(transaction.totalAmount)}",
+                    color = if (isSelesai) GreenText else if (transaction.status.equals("Batal", ignoreCase = true)) RedText else DarkNavy,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    textDecoration = if (!isSelesai) TextDecoration.LineThrough else null // Efek coret jika dibatalkan
+                    textDecoration = if (transaction.status.equals("Batal", ignoreCase = true)) TextDecoration.LineThrough else null
                 )
             }
         }
-    }
-}
-
-// Navigasi Bawah Khusus (Laporan Aktif)
-@Composable
-fun LaporanBottomNav(navController: NavController) {
-    NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.GridView, contentDescription = "Beranda") },
-            label = { Text("Beranda") },
-            selected = false,
-            onClick = { navController.navigate("dashboard") },
-            colors = NavigationBarItemDefaults.colors(unselectedIconColor = TextGray, unselectedTextColor = TextGray)
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Inventory2, contentDescription = "Kelola") },
-            label = { Text("Kelola") },
-            selected = false,
-            onClick = { navController.navigate("menu") },
-            colors = NavigationBarItemDefaults.colors(unselectedIconColor = TextGray, unselectedTextColor = TextGray)
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.Assessment, contentDescription = "Laporan") },
-            label = { Text("Laporan", fontWeight = FontWeight.Bold) },
-            selected = true,
-            onClick = { /* Sudah di halaman Laporan/Transaksi */ },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = DarkNavy,
-                selectedTextColor = DarkNavy,
-                indicatorColor = Color(0xFFE2E8F0) // Background biru keabu-abuan terang
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Person, contentDescription = "Profil") },
-            label = { Text("Profil") },
-            selected = false,
-            onClick = { navController.navigate("profil") },
-            colors = NavigationBarItemDefaults.colors(unselectedIconColor = TextGray, unselectedTextColor = TextGray)
-        )
     }
 }

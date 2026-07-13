@@ -9,7 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +22,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tr.ui.theme.BgColor
 import com.example.tr.ui.theme.CardBg
 import com.example.tr.ui.theme.DarkNavy
@@ -29,36 +30,99 @@ import com.example.tr.ui.theme.IconBgColor
 import com.example.tr.ui.theme.PrimaryBlue
 import com.example.tr.ui.theme.TextGray
 import com.example.tr.uitr.navigation.Screen
-
-// --- PENGATURAN WARNA KHUSUS UI INI ---
-
+import com.example.tr.uitr.viewmodel.TransactionViewModel
+import com.example.tr.uitr.viewmodel.AttendanceViewModel
+import com.example.tr.uitr.viewmodel.MenuViewModel
+import com.example.tr.uitr.viewmodel.AuthViewModel
+import com.example.tr.uitr.components.AppDrawer
+import androidx.navigation.compose.currentBackStackEntryAsState
+import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(navController: NavController) {
-    Scaffold(
-        containerColor = BgColor,
-        bottomBar = { DashboardBottomNav() }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-            item { TopBarSection() }
-            item { RingkasanHariIniBanner() }
-            item { SummaryGridSection() }
-            item { AksesCepatSection(navController) }
-            item { Spacer(modifier = Modifier.height(16.dp)) }
+fun DashboardScreen(
+    navController: NavController,
+    transactionViewModel: TransactionViewModel = viewModel(),
+    attendanceViewModel: AttendanceViewModel = viewModel(),
+    menuViewModel: MenuViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val totalPenjualan = transactionViewModel.transactions
+        .filter { it.status.equals("completed", ignoreCase = true) || it.status.equals("Berhasil", ignoreCase = true) }
+        .sumOf { it.totalAmount }
+    val totalTransaksi = transactionViewModel.transactions.size
+    val totalMenu = menuViewModel.menus.size
+    val stafHadir = attendanceViewModel.attendances.count { it.status.equals("Hadir", ignoreCase = true) }
+    val totalStaf = attendanceViewModel.attendances.size
+
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
+                navController = navController,
+                currentRoute = currentRoute,
+                onCloseDrawer = { scope.launch { drawerState.close() } }
+            )
+        }
+    ) {
+        Scaffold(
+            containerColor = BgColor,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Dashboard", fontWeight = FontWeight.Bold, color = DarkNavy) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = DarkNavy)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BgColor)
+                )
+            }
+        ) { paddingValues ->
+            if (transactionViewModel.isLoading || attendanceViewModel.isLoading || menuViewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                    item { TopBarSection(authViewModel) }
+                    item { RingkasanHariIniBanner() }
+                    item {
+                        SummaryGridSection(
+                            totalPenjualan = totalPenjualan,
+                            totalTransaksi = totalTransaksi,
+                            totalMenu = totalMenu,
+                            stafHadir = stafHadir,
+                            totalStaf = totalStaf
+                        )
+                    }
+                    item { AksesCepatSection(navController) }
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun TopBarSection() {
+fun TopBarSection(authViewModel: AuthViewModel) {
+    val userName = authViewModel.user?.name ?: "User"
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -73,13 +137,13 @@ fun TopBarSection() {
                     .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Person, contentDescription = "Profil", tint = Color.White)
+                Text(userName.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(text = "Selamat datang,", color = TextGray, fontSize = 12.sp)
                 Text(
-                    text = "Manager Profile",
+                    text = userName,
                     color = DarkNavy,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
@@ -120,38 +184,44 @@ fun RingkasanHariIniBanner() {
 }
 
 @Composable
-fun SummaryGridSection() {
+fun SummaryGridSection(
+    totalPenjualan: Double,
+    totalTransaksi: Int,
+    totalMenu: Int,
+    stafHadir: Int,
+    totalStaf: Int
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SummaryCard(
                 modifier = Modifier.weight(1f),
                 title = "Total Penjualan",
-                value = "Rp 12.5M",
+                value = "Rp ${NumberFormat.getNumberInstance(Locale("id", "ID")).format(totalPenjualan)}",
                 icon = Icons.Outlined.Payments,
-                indicatorColor = Color(0xFF3B82F6) // Biru
+                indicatorColor = Color(0xFF3B82F6)
             )
             SummaryCard(
                 modifier = Modifier.weight(1f),
                 title = "Transaksi",
-                value = "128",
+                value = totalTransaksi.toString(),
                 icon = Icons.Outlined.Receipt,
-                indicatorColor = Color(0xFF8B5CF6) // Ungu
+                indicatorColor = Color(0xFF8B5CF6)
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SummaryCard(
                 modifier = Modifier.weight(1f),
-                title = "Item Terjual",
-                value = "432",
-                icon = Icons.Outlined.Inventory2,
-                indicatorColor = Color(0xFFEAB308) // Kuning
+                title = "Total Menu",
+                value = totalMenu.toString(),
+                icon = Icons.Outlined.RestaurantMenu,
+                indicatorColor = Color(0xFFEAB308)
             )
             SummaryCard(
                 modifier = Modifier.weight(1f),
-                title = "Staf Aktif",
-                value = "8/12",
+                title = "Staf Hadir",
+                value = "$stafHadir/$totalStaf",
                 icon = Icons.Outlined.Badge,
-                indicatorColor = Color(0xFFEF4444) // Merah
+                indicatorColor = Color(0xFFEF4444)
             )
         }
     }
@@ -314,8 +384,6 @@ fun QuickAccessItem(
     }
 }
 
-
-
 @Composable
 fun ActivityItem(icon: ImageVector, iconTint: Color, time: String, boldText: String, normalText: String) {
     Row(verticalAlignment = Alignment.Top) {
@@ -350,57 +418,5 @@ fun ActivityItem(icon: ImageVector, iconTint: Color, time: String, boldText: Str
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = time, color = TextGray, fontSize = 11.sp)
         }
-    }
-}
-
-@Composable
-fun DashboardBottomNav() {
-    NavigationBar(
-        containerColor = Color.White,
-        tonalElevation = 8.dp
-    ) {
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.GridView, contentDescription = "Beranda") },
-            label = { Text("Beranda", fontWeight = FontWeight.Bold) },
-            selected = true,
-            onClick = { /* TODO */ },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = PrimaryBlue,
-                selectedTextColor = PrimaryBlue,
-                indicatorColor = IconBgColor, // Latar belakang pil biru
-                unselectedIconColor = TextGray,
-                unselectedTextColor = TextGray
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Inventory2, contentDescription = "Kelola") },
-            label = { Text("Kelola") },
-            selected = false,
-            onClick = { /* TODO */ },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextGray,
-                unselectedTextColor = TextGray
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Assessment, contentDescription = "Laporan") },
-            label = { Text("Laporan") },
-            selected = false,
-            onClick = { /* TODO */ },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextGray,
-                unselectedTextColor = TextGray
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Person, contentDescription = "Profil") },
-            label = { Text("Profil") },
-            selected = false,
-            onClick = { /* TODO */ },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextGray,
-                unselectedTextColor = TextGray
-            )
-        )
     }
 }

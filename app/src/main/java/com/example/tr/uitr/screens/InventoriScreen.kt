@@ -24,152 +24,172 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.tr.data.dummy.DummyDataSource
-import com.example.tr.data.model.InventoriData
-import com.example.tr.ui.theme.GreenBg
-import com.example.tr.ui.theme.GreenText
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.tr.data.remote.model.Ingredient
+import com.example.tr.data.remote.model.IngredientRequest
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.tr.uitr.components.AppDrawer
+import com.example.tr.uitr.components.StatusBadge
+import com.example.tr.uitr.navigation.Screen
+import com.example.tr.uitr.viewmodel.IngredientViewModel
 import com.example.tr.ui.theme.RedBg
 import com.example.tr.ui.theme.RedText
-import com.example.tr.ui.theme.YellowBg
-import com.example.tr.ui.theme.YellowText
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.layout.ContentScale
 
-
-import java.util.UUID
-
-// Warna Khusus Layar Inventori
-private val DarkNavy = Color(0xFF1A365D) // Sedikit lebih gelap menyesuaikan desain
+private val DarkNavy = Color(0xFF1A365D)
 private val BgLight = Color(0xFFF8F9FE)
 private val TextGray = Color(0xFF7A869A)
 
-// Warna Badge Status
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InventoriScreen(navController: NavController) {
-    // STATE LOKAL
-    val inventoriList = remember { mutableStateListOf(*DummyDataSource.dummyInventoriList.toTypedArray()) }
+fun InventoriScreen(navController: NavController, viewModel: IngredientViewModel = viewModel()) {
+    val ingredients = viewModel.ingredients
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("Semua") }
     val filters = listOf("Semua", "Stok Rendah", "Habis")
 
-    // State untuk Dialog Tambah/Edit
     var showFormDialog by remember { mutableStateOf(false) }
-    var selectedItem by remember { mutableStateOf<InventoriData?>(null) }
+    var selectedItem by remember { mutableStateOf<Ingredient?>(null) }
 
-    // Logika Filter
-    val filteredList = inventoriList.filter { item ->
+    val filteredList = ingredients.filter { item ->
+        val status = when {
+            item.stockQuantity <= 0.0 -> "Habis"
+            item.stockQuantity <= 5.0 -> "Stok Rendah"
+            else -> "Cukup"
+        }
         val matchFilter = when (selectedFilter) {
-            "Stok Rendah" -> item.status == "Rendah"
-            "Habis" -> item.status == "Habis"
+            "Stok Rendah" -> status == "Stok Rendah"
+            "Habis" -> status == "Habis"
             else -> true
         }
-        matchFilter && item.nama.contains(searchQuery, ignoreCase = true)
+        matchFilter && item.name.contains(searchQuery, ignoreCase = true)
     }
 
-    Scaffold(
-        containerColor = BgLight,
-        topBar = { TopBarInventori() },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    selectedItem = null // Kosongkan untuk tambah baru
-                    showFormDialog = true
-                },
-                containerColor = DarkNavy,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
+                navController = navController,
+                currentRoute = currentRoute,
+                onCloseDrawer = { scope.launch { drawerState.close() } }
+            )
+        }
+    ) {
+        Scaffold(
+            containerColor = BgLight,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Inventori", fontWeight = FontWeight.Bold, color = DarkNavy) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = DarkNavy)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BgLight)
+                )
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = {
+                        selectedItem = null
+                        showFormDialog = true
+                    },
+                    containerColor = DarkNavy,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Tambah")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tambah Item", fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Tambah")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Tambah Item", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-        },
-        bottomBar = { KelolaBottomNav(navController) } // Menggunakan navigasi "Kelola" aktif dari file KelolaMenuScreen
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
+        ) { paddingValues ->
+            if (viewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            // Header Teks (opsional, jika ingin persis gambar bisa di-skip karena judul ada di TopBar)
-
-            // Search Bar
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Cari item...", color = TextGray) },
-                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
-                    shape = RoundedCornerShape(12.dp),
-//                    colors = TextFieldDefaults.outlinedTextFieldColors(
-//                        containerColor = Color.White,
-//                        unfocusedBorderColor = Color(0xFFE2E8F0),
-//                        focusedBorderColor = DarkNavy
-//                    ),
-                    modifier = Modifier.fillMaxWidth().height(56.dp)
-                )
-            }
-
-            // Filter Chips
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(filters) { filter ->
-                        FilterChipInventori(
-                            title = filter,
-                            isSelected = filter == selectedFilter,
-                            onClick = { selectedFilter = filter }
+                    item {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Cari item...", color = TextGray) },
+                            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(56.dp)
                         )
                     }
+
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(filters) { filter ->
+                                FilterChipInventori(
+                                    title = filter,
+                                    isSelected = filter == selectedFilter,
+                                    onClick = { selectedFilter = filter }
+                                )
+                            }
+                        }
+                    }
+
+                    items(filteredList) { ingredient ->
+                        InventoriCardItem(
+                            ingredient = ingredient,
+                            onEditClick = {
+                                selectedItem = ingredient
+                                showFormDialog = true
+                            }
+                        )
+                    }
+
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
-
-            // List Item Inventori
-            items(filteredList) { inventori ->
-                InventoriCardItem(
-                    inventori = inventori,
-                    onEditClick = {
-                        selectedItem = inventori
-                        showFormDialog = true
-                    }
-                )
-            }
-
-            item { Spacer(modifier = Modifier.height(80.dp)) } // Hindari tumpang tindih dengan FAB
         }
     }
 
-    // Dialog Tambah / Edit Form
     if (showFormDialog) {
         FormInventoriDialog(
             item = selectedItem,
             onDismiss = { showFormDialog = false },
-            onSave = { nama, jumlah, satuan ->
-                // Logika status otomatis berdasarkan stok
-                val status = when {
-                    jumlah <= 0.0 -> "Habis"
-                    jumlah <= 5.0 -> "Rendah"
-                    else -> "Cukup"
-                }
+            onSave = { name, quantity, unit, imageUri ->
+                // CATATAN PENTING:
+                // Karena API meminta File (multipart), kamu harus mengubah fungsi di ViewModel
+                // agar bisa menerima 'imageUri' dan mengubahnya menjadi MultipartBody.Part
 
+                // Untuk sementara, jika ViewModel belum diupdate, kodenya seperti ini:
+                val request = IngredientRequest(name, quantity, unit, imageUri?.toString())
                 if (selectedItem == null) {
-                    // Tambah Baru
-                    inventoriList.add(InventoriData(UUID.randomUUID().toString(), nama, jumlah, satuan, status))
+                    viewModel.createIngredient(request) // Idealnya: viewModel.createIngredient(name, quantity, unit, imageUri, context)
                 } else {
-                    // Update
-                    val index = inventoriList.indexOfFirst { it.id == selectedItem!!.id }
-                    if (index != -1) {
-                        inventoriList[index] = selectedItem!!.copy(nama = nama, jumlah = jumlah, satuan = satuan, status = status)
-                    }
+                    viewModel.updateIngredient(selectedItem!!.id, request)
                 }
                 showFormDialog = false
             }
@@ -177,23 +197,10 @@ fun InventoriScreen(navController: NavController) {
     }
 }
 
+
 @Composable
 fun TopBarInventori() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.LightGray),
-                contentAlignment = Alignment.Center
-            ) { Icon(Icons.Filled.Person, contentDescription = "Profil", tint = Color.White, modifier = Modifier.size(20.dp)) }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text("Inventori", color = DarkNavy, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-        Icon(Icons.Outlined.Notifications, contentDescription = "Notifikasi", tint = DarkNavy)
-    }
+    // Deprecated
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -216,53 +223,61 @@ fun FilterChipInventori(title: String, isSelected: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-fun InventoriCardItem(inventori: InventoriData, onEditClick: () -> Unit) {
-    val isHabis = inventori.status == "Habis"
-    val isRendah = inventori.status == "Rendah"
-
-    val badgeBg = when {
-        isHabis -> RedBg
-        isRendah -> YellowBg
-        else -> GreenBg
+fun InventoriCardItem(ingredient: Ingredient, onEditClick: () -> Unit) {
+    val status = when {
+        ingredient.stockQuantity <= 0.0 -> "Habis"
+        ingredient.stockQuantity <= 5.0 -> "Rendah"
+        else -> "Cukup"
     }
-    val badgeText = when {
-        isHabis -> RedText
-        isRendah -> YellowText
-        else -> GreenText
-    }
+    val isHabis = status == "Habis"
 
-    // Format jumlah: hilangkan desimal ".0" jika angkanya bulat (misal 15.0 jadi 15)
-    val formattedJumlah = if (inventori.jumlah % 1.0 == 0.0) {
-        inventori.jumlah.toInt().toString()
+    val formattedJumlah = if (ingredient.stockQuantity % 1.0 == 0.0) {
+        ingredient.stockQuantity.toInt().toString()
     } else {
-        inventori.jumlah.toString()
+        ingredient.stockQuantity.toString()
     }
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, if (isHabis) RedBg else Color.Transparent), // Efek border merah tipis jika habis seperti di desain
+        border = BorderStroke(1.dp, if (isHabis) RedBg else Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            // Konten Utama
             Column {
-                // Placeholder Gambar Bulat/Kotak
-                Box(
-                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFE2E8F0)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Outlined.Inventory, contentDescription = "Image", tint = TextGray)
+                if (!ingredient.imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(ingredient.imageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Gambar ${ingredient.name}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFE2E8F0))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFE2E8F0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.Inventory, contentDescription = "Image", tint = TextGray)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text(text = inventori.nama, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkNavy)
+                Text(text = ingredient.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkNavy)
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "$formattedJumlah ${inventori.satuan}",
+                    text = "$formattedJumlah ${ingredient.unit}",
                     fontSize = 13.sp,
                     color = if (isHabis) RedText else TextGray,
                     fontWeight = if (isHabis) FontWeight.Bold else FontWeight.Normal
@@ -270,28 +285,9 @@ fun InventoriCardItem(inventori: InventoriData, onEditClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Badge Status dengan Titik (Dot)
-                Surface(
-                    color = badgeBg,
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(badgeText))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = inventori.status,
-                            color = badgeText,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                StatusBadge(status = status)
             }
 
-            // Tombol Edit di Pojok Kanan Atas
             Icon(
                 imageVector = Icons.Outlined.Edit,
                 contentDescription = "Edit",
@@ -308,37 +304,84 @@ fun InventoriCardItem(inventori: InventoriData, onEditClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FormInventoriDialog(
-    item: InventoriData?,
+    item: Ingredient?,
     onDismiss: () -> Unit,
-    onSave: (String, Double, String) -> Unit
+    onSave: (String, Double, String, Uri?) -> Unit // <-- Tambahkan parameter Uri?
 ) {
-    var nama by remember { mutableStateOf(item?.nama ?: "") }
-    var jumlahInput by remember { mutableStateOf(item?.jumlah?.toString() ?: "") }
-    var satuan by remember { mutableStateOf(item?.satuan ?: "kg") }
+    var nama by remember { mutableStateOf(item?.name ?: "") }
+    var jumlahInput by remember { mutableStateOf(item?.stockQuantity?.toString() ?: "") }
+    var satuan by remember { mutableStateOf(item?.unit ?: "kg") }
+
+    // State untuk menyimpan URI gambar yang dipilih dari galeri
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Launcher untuk membuka Galeri HP
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        imageUri = uri
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (item == null) "Tambah Item" else "Edit Item", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                // --- KOTAK PEMILIH GAMBAR ---
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFE2E8F0))
+                        .clickable { launcher.launch("image/*") }, // Buka galeri saat diklik
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (imageUri != null) {
+                        // Tampilkan preview gambar yang baru dipilih
+                        AsyncImage(
+                            model = imageUri,
+                            contentDescription = "Selected Image",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else if (!item?.imageUrl.isNullOrEmpty()) {
+                        // Tampilkan gambar lama jika sedang mode Edit
+                        AsyncImage(
+                            model = item!!.imageUrl,
+                            contentDescription = "Current Image",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        // Placeholder jika belum ada gambar
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Pick Image", tint = TextGray, modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Klik untuk pilih gambar *", fontSize = 12.sp, color = TextGray)
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = nama,
                     onValueChange = { nama = it },
-                    label = { Text("Nama Item") },
+                    label = { Text("Nama Item *") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = jumlahInput,
                         onValueChange = { jumlahInput = it },
-                        label = { Text("Jumlah") },
+                        label = { Text("Jumlah *") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f)
                     )
                     OutlinedTextField(
                         value = satuan,
                         onValueChange = { satuan = it },
-                        label = { Text("Satuan") },
+                        label = { Text("Satuan *") },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -348,7 +391,10 @@ fun FormInventoriDialog(
             Button(
                 onClick = {
                     val jumlah = jumlahInput.toDoubleOrNull() ?: 0.0
-                    if (nama.isNotBlank()) onSave(nama, jumlah, satuan)
+                    // Validasi: pastikan nama terisi (gambar idealnya juga divalidasi jika wajib)
+                    if (nama.isNotBlank()) {
+                        onSave(nama, jumlah, satuan, imageUri)
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = DarkNavy)
             ) { Text("Simpan") }

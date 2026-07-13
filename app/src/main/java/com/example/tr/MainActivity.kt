@@ -19,10 +19,15 @@ import com.example.tr.uitr.screens.InventoriScreen
 import com.example.tr.uitr.screens.KelolaKaryawanScreen
 import com.example.tr.uitr.screens.KelolaMenuScreen
 import com.example.tr.uitr.screens.RiwayatTransaksiScreen
+import com.example.tr.uitr.screens.ProfilScreen
+import com.example.tr.uitr.screens.LaporanScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // TokenManager dihapus sesuai permintaan
+        val startDestination = Screen.Login.route
+
         setContent {
             TRTheme {
                 Surface(
@@ -31,7 +36,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
 
-                    NavHost(navController = navController, startDestination = Screen.Login.route) {
+                    NavHost(navController = navController, startDestination = startDestination) {
                         composable(Screen.Login.route) {
                             LoginScreen(navController)
                         }
@@ -53,7 +58,12 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Inventori.route) {
                             InventoriScreen(navController)
                         }
-                        // Layar lainnya akan ditambahkan di sini
+                        composable(Screen.Profil.route) {
+                            ProfilScreen(navController)
+                        }
+                        composable(Screen.Laporan.route) {
+                            LaporanScreen(navController)
+                        }
                     }
                 }
             }
