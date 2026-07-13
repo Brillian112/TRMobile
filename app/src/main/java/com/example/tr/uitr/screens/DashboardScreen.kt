@@ -59,6 +59,7 @@ fun DashboardScreen(
 
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
+    val userRole = authViewModel.user?.role ?: ""
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -68,7 +69,9 @@ fun DashboardScreen(
         drawerContent = {
             AppDrawer(
                 navController = navController,
+
                 currentRoute = currentRoute,
+
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }

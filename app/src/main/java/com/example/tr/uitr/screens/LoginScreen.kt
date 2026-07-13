@@ -33,7 +33,7 @@ fun LoginScreen(navController: NavController, viewModel: AuthViewModel = viewMod
         )
         Text(text = "Masuk sebagai $selectedRole", modifier = Modifier.padding(bottom = 32.dp))
 
-        // Role Toggle (Manajer / Karyawan)
+        // Role Toggle (Manajer / Karyawan) - Hanya untuk tampilan UI
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             if (selectedRole == "Manager") {
                 Button(onClick = { selectedRole = "Manager" }, modifier = Modifier.weight(1f)) {
@@ -88,8 +88,21 @@ fun LoginScreen(navController: NavController, viewModel: AuthViewModel = viewMod
 
         Button(
             onClick = {
-                viewModel.login(username, password) {
-                    navController.navigate(Screen.Dashboard.route) {
+                viewModel.login(username, password) { user ->
+
+                    // Sekarang user.role pasti ADA isinya hasil dari API GET /api/users/{id}
+                    val safeRole = user?.role?.lowercase() ?: ""
+
+                    android.util.Log.d("KASIRKU_DEBUG", "Role asli dari database: '$safeRole'")
+                    android.util.Log.d("KASIRKU_DEBUG", "nama: '$username'")
+
+                    val destination = when (safeRole) {
+                        "admin", "manager", "manajer" -> Screen.Dashboard.route // Ke Dashboard Manajer
+                        "employee", "karyawan", "kasir" -> Screen.DashboardKasir.route // Ke Dashboard Kasir
+                        else -> Screen.DashboardKasir.route // Default jika role aneh
+                    }
+
+                    navController.navigate(destination) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }

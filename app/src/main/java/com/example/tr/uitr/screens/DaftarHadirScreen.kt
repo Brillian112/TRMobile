@@ -23,23 +23,27 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.tr.uitr.components.AppDrawer
-import com.example.tr.uitr.components.StatusBadge
-import com.example.tr.uitr.navigation.Screen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tr.data.remote.model.Attendance
 import com.example.tr.uitr.viewmodel.AttendanceViewModel
+import com.example.tr.uitr.viewmodel.AuthViewModel
 import com.example.tr.ui.theme.BgLight
 import com.example.tr.ui.theme.DarkNavy
 import com.example.tr.ui.theme.GreenIcon
 import com.example.tr.ui.theme.RedIcon
 import com.example.tr.ui.theme.TextGray
 import com.example.tr.ui.theme.YellowIcon
+import com.example.tr.uitr.components.StatusBadge
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DaftarHadirScreen(navController: NavController, viewModel: AttendanceViewModel = viewModel()) {
+fun DaftarHadirScreen(
+    navController: NavController,
+    viewModel: AttendanceViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val userRole = authViewModel.user?.role ?: ""
     // STATE FROM VIEWMODEL
     val attendanceList = viewModel.attendances
     var searchQuery by remember { mutableStateOf("") }
@@ -72,6 +76,7 @@ fun DaftarHadirScreen(navController: NavController, viewModel: AttendanceViewMod
             AppDrawer(
                 navController = navController,
                 currentRoute = currentRoute,
+
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }

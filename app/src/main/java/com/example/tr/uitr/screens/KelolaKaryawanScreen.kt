@@ -25,20 +25,25 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tr.data.remote.model.User
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.tr.uitr.components.AppDrawer
-import com.example.tr.uitr.components.StatusBadge
-import com.example.tr.uitr.navigation.Screen
 import com.example.tr.uitr.viewmodel.KaryawanViewModel
+import com.example.tr.uitr.viewmodel.AuthViewModel
 import com.example.tr.ui.theme.BgLight
 import com.example.tr.ui.theme.DarkText
 import com.example.tr.ui.theme.PrimaryBlue
 import com.example.tr.ui.theme.PurplePrimary
 import com.example.tr.ui.theme.TextGray
 import com.example.tr.ui.theme.DarkNavy
+import com.example.tr.uitr.components.StatusBadge
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KelolaKaryawanScreen(navController: NavController, viewModel: KaryawanViewModel = viewModel()) {
+fun KelolaKaryawanScreen(
+    navController: NavController,
+    viewModel: KaryawanViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val userRole = authViewModel.user?.role ?: ""
     // STATE MANAGEMENT DARI VIEWMODEL
     val karyawanList = viewModel.employees
 
@@ -62,7 +67,9 @@ fun KelolaKaryawanScreen(navController: NavController, viewModel: KaryawanViewMo
         drawerContent = {
             AppDrawer(
                 navController = navController,
+
                 currentRoute = currentRoute,
+
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }

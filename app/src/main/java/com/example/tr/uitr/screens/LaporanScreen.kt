@@ -6,7 +6,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -19,6 +18,7 @@ import com.example.tr.ui.theme.BgColor
 import com.example.tr.ui.theme.DarkNavy
 import com.example.tr.uitr.components.AppDrawer
 import com.example.tr.uitr.viewmodel.TransactionViewModel
+import com.example.tr.uitr.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
@@ -27,8 +27,10 @@ import java.util.Locale
 @Composable
 fun LaporanScreen(
     navController: NavController,
-    transactionViewModel: TransactionViewModel = viewModel()
+    transactionViewModel: TransactionViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
+    val userRole = authViewModel.user?.role ?: ""
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val navBackStackEntry = navController.currentBackStackEntryAsState()
@@ -45,7 +47,9 @@ fun LaporanScreen(
         drawerContent = {
             AppDrawer(
                 navController = navController,
+
                 currentRoute = currentRoute,
+
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }

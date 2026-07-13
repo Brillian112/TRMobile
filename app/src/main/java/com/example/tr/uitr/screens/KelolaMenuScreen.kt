@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,7 +15,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tr.data.remote.model.Menu
 import com.example.tr.data.remote.model.MenuRequest
 import com.example.tr.uitr.viewmodel.MenuViewModel
+import com.example.tr.uitr.viewmodel.AuthViewModel
 import com.example.tr.ui.theme.BgLight
 import com.example.tr.ui.theme.DarkText
 import com.example.tr.ui.theme.PurplePrimary
@@ -39,7 +38,12 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KelolaMenuScreen(navController: NavController, viewModel: MenuViewModel = viewModel()) {
+fun KelolaMenuScreen(
+    navController: NavController,
+    viewModel: MenuViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val userRole = authViewModel.user?.role ?: ""
 
     LaunchedEffect(Unit) {
         viewModel.fetchMenus()
@@ -66,7 +70,9 @@ fun KelolaMenuScreen(navController: NavController, viewModel: MenuViewModel = vi
         drawerContent = {
             AppDrawer(
                 navController = navController,
+
                 currentRoute = currentRoute,
+
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }

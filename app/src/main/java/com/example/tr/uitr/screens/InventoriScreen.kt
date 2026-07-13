@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -29,9 +28,8 @@ import com.example.tr.data.remote.model.Ingredient
 import com.example.tr.data.remote.model.IngredientRequest
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.tr.uitr.components.AppDrawer
-import com.example.tr.uitr.components.StatusBadge
-import com.example.tr.uitr.navigation.Screen
 import com.example.tr.uitr.viewmodel.IngredientViewModel
+import com.example.tr.uitr.viewmodel.AuthViewModel
 import com.example.tr.ui.theme.RedBg
 import com.example.tr.ui.theme.RedText
 import coil.compose.AsyncImage
@@ -42,6 +40,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.layout.ContentScale
+import com.example.tr.uitr.components.StatusBadge
 
 private val DarkNavy = Color(0xFF1A365D)
 private val BgLight = Color(0xFFF8F9FE)
@@ -49,7 +48,12 @@ private val TextGray = Color(0xFF7A869A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InventoriScreen(navController: NavController, viewModel: IngredientViewModel = viewModel()) {
+fun InventoriScreen(
+    navController: NavController,
+    viewModel: IngredientViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val userRole = authViewModel.user?.role ?: ""
     val ingredients = viewModel.ingredients
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("Semua") }
@@ -83,7 +87,9 @@ fun InventoriScreen(navController: NavController, viewModel: IngredientViewModel
         drawerContent = {
             AppDrawer(
                 navController = navController,
+
                 currentRoute = currentRoute,
+
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }

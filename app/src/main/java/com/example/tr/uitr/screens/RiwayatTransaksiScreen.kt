@@ -1,13 +1,10 @@
 package com.example.tr.uitr.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -25,27 +21,28 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.tr.uitr.components.AppDrawer
-import com.example.tr.uitr.components.StatusBadge
-import com.example.tr.uitr.navigation.Screen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.tr.data.remote.model.Transaction
 import com.example.tr.uitr.viewmodel.TransactionViewModel
+import com.example.tr.uitr.viewmodel.AuthViewModel
 import com.example.tr.ui.theme.BgLight
 import com.example.tr.ui.theme.DarkNavy
 import com.example.tr.ui.theme.TextGray
-import com.example.tr.ui.theme.GreenBg
 import com.example.tr.ui.theme.GreenText
-import com.example.tr.ui.theme.RedBg
 import com.example.tr.ui.theme.RedText
-import com.example.tr.ui.theme.YellowBg
-import com.example.tr.ui.theme.YellowText
+import com.example.tr.uitr.components.StatusBadge
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RiwayatTransaksiScreen(navController: NavController, viewModel: TransactionViewModel = viewModel()) {
+fun RiwayatTransaksiScreen(
+    navController: NavController,
+    viewModel: TransactionViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val userRole = authViewModel.user?.role ?: ""
     // STATE MANAGEMENT FROM VIEWMODEL
     val transactions = viewModel.transactions
     var searchQuery by remember { mutableStateOf("") }
@@ -82,7 +79,9 @@ fun RiwayatTransaksiScreen(navController: NavController, viewModel: TransactionV
         drawerContent = {
             AppDrawer(
                 navController = navController,
+
                 currentRoute = currentRoute,
+
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }

@@ -87,7 +87,7 @@ interface ApiService {
     suspend fun getTransactionById(@Path("id") id: Long): SingleTransactionResponse
 
     @POST("api/transactions")
-    suspend fun createTransaction(@Body request: TransactionRequest): SingleTransactionResponse
+    suspend fun createTransaction(@Body request: TransactionRequest): TransactionResponse
 
     @PUT("api/transactions/{id}/status")
     suspend fun updateTransactionStatus(@Path("id") id: Long, @Query("status") status: String): SingleTransactionResponse
@@ -95,6 +95,12 @@ interface ApiService {
     // Attendances
     @GET("api/attendances")
     suspend fun getAttendances(): AttendanceResponse
+
+    @POST("api/attendances/check-in")
+    suspend fun checkIn(@Body body: Map<String, String>): Response<AttendanceResponse>
+
+    @PUT("api/attendances/check-out")
+    suspend fun checkOut(@Body body: Map<String, String>): Response<AttendanceResponse>
 
     @POST("api/attendances")
     suspend fun createAttendance(@Body request: AttendanceRequest): SingleAttendanceResponse
