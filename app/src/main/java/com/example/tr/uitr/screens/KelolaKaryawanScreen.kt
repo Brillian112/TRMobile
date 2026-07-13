@@ -175,6 +175,10 @@ fun KelolaKaryawanScreen(navController: NavController, viewModel: KaryawanViewMo
             onDismiss = { showFormDialog = false },
             onSave = { nama, password, peran ->
                 if (selectedKaryawan == null) {
+                    // Tambah Karyawan Baru
+                    karyawanList.add(
+                        KaryawanData(id = UUID.randomUUID().toString(), nama = nama, peran = peran, password = "password", status = status)
+                    )
                     viewModel.createEmployee(nama, password, peran)
                 } else {
                     viewModel.updateEmployee(selectedKaryawan!!.id, nama, password, peran)
