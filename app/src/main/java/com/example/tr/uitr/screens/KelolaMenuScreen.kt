@@ -2,6 +2,7 @@ package com.example.tr.uitr.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,147 +22,191 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.tr.data.dummy.DummyDataSource
-import com.example.tr.data.model.MenuData
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.tr.data.remote.model.Menu
+import com.example.tr.data.remote.model.MenuRequest
+import com.example.tr.uitr.viewmodel.MenuViewModel
 import com.example.tr.ui.theme.BgLight
 import com.example.tr.ui.theme.DarkText
 import com.example.tr.ui.theme.PurplePrimary
 import com.example.tr.ui.theme.TextGray
+import com.example.tr.ui.theme.DarkNavy
+import com.example.tr.uitr.components.AppDrawer
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
-// Warna khusus untuk layar Kelola Menu
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KelolaMenuScreen(navController: NavController) {
+fun KelolaMenuScreen(navController: NavController, viewModel: MenuViewModel = viewModel()) {
+
+    LaunchedEffect(Unit) {
+        viewModel.fetchMenus()
+        viewModel.fetchCategories()
+    }
+
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("Semua") }
-    val categories = listOf("Semua", "Makanan", "Minuman", "Snack")
-    val menuList = DummyDataSource.dummyMenuList
+    var selectedCategoryName by remember { mutableStateOf("Semua") }
 
-    Scaffold(
-        containerColor = BgLight,
-        topBar = { TopBarMenu() },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { /* TODO: Navigasi ke form tambah menu */ },
-                containerColor = PurplePrimary,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+    val menuList = viewModel.menus
+    val apiCategories = viewModel.categories
+
+    var showFormDialog by remember { mutableStateOf(false) }
+    var selectedMenu by remember { mutableStateOf<Menu?>(null) }
+
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
+                navController = navController,
+                currentRoute = currentRoute,
+                onCloseDrawer = { scope.launch { drawerState.close() } }
+            )
+        }
+    ) {
+        Scaffold(
+            containerColor = BgLight,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Kelola Menu", fontWeight = FontWeight.Bold, color = DarkNavy) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = DarkNavy)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BgLight)
+                )
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = {
+                        selectedMenu = null
+                        showFormDialog = true
+                    },
+                    containerColor = PurplePrimary,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Tambah")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tambah Menu", fontWeight = FontWeight.Bold)
-                }
-            }
-        },
-        bottomBar = { KelolaBottomNav(navController) }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
-
-            // Header
-            item {
-                Text(
-                    text = "Kelola Menu",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkText
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Atur dan perbarui daftar menu restoran Anda.",
-                    fontSize = 13.sp,
-                    color = TextGray
-                )
-            }
-
-            // Search Bar
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Cari menu...", color = TextGray) },
-                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
-                    shape = RoundedCornerShape(12.dp),
-//                    colors = TextFieldDefaults.colors(
-//                        containerColor = Color.White,
-//                        unfocusedBorderColor = Color(0xFFE2E8F0),
-//                        focusedBorderColor = PurplePrimary
-//                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // Filter Chips
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(categories) { category ->
-                        CategoryChip(
-                            title = category,
-                            isSelected = category == selectedCategory,
-                            onClick = { selectedCategory = category }
-                        )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Tambah")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Tambah Menu", fontWeight = FontWeight.Bold)
                     }
                 }
             }
+        ) { paddingValues ->
+            if (viewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            // List Menu
-            items(menuList) { menu ->
-                MenuCardItem(menu = menu)
+                    // Header dihapus karena sudah ada di TopBar
+                    
+                    // Search Bar
+                    item {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Cari menu...", color = TextGray) },
+                            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // Filter Chips
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                CategoryChip(
+                                    title = "Semua",
+                                    isSelected = selectedCategoryName == "Semua",
+                                    onClick = { selectedCategoryName = "Semua" }
+                                )
+                            }
+                            items(apiCategories) { category ->
+                                CategoryChip(
+                                    title = category.name,
+                                    isSelected = category.name == selectedCategoryName,
+                                    onClick = { selectedCategoryName = category.name }
+                                )
+                            }
+                        }
+                    }
+
+                    // List Menu
+                    val filteredList = menuList.filter { menu ->
+                        val matchesCategory = if (selectedCategoryName == "Semua") {
+                            true
+                        } else {
+                            val categoryName = menu.category?.name ?: apiCategories.find { it.id == menu.categoryId }?.name
+                            categoryName == selectedCategoryName
+                        }
+                        
+                        matchesCategory && menu.name.contains(searchQuery, ignoreCase = true)
+                    }
+
+                    items(filteredList) { menu ->
+                        val categoryName = menu.category?.name ?: apiCategories.find { it.id == menu.categoryId }?.name ?: "No Category"
+                        MenuCardItem(
+                            menu = menu,
+                            categoryName = categoryName,
+                            onEditClick = {
+                                selectedMenu = menu
+                                showFormDialog = true
+                            },
+                            onDeleteClick = {
+                                viewModel.deleteMenu(menu.id)
+                            }
+                        )
+                    }
+
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
+                }
             }
-
-            item { Spacer(modifier = Modifier.height(80.dp)) } // Spacer agar tidak tertutup FAB
         }
+    }
+
+    if (showFormDialog) {
+        FormMenuDialog(
+            menu = selectedMenu,
+            categories = viewModel.categories,
+            onDismiss = { showFormDialog = false },
+            onSave = { name, description, price, isAvailable, categoryId ->
+                val request = MenuRequest(name, description, price, isAvailable, categoryId, null)
+                if (selectedMenu == null) {
+                    viewModel.createMenu(request)
+                } else {
+                    viewModel.updateMenu(selectedMenu!!.id, request)
+                }
+                showFormDialog = false
+            }
+        )
     }
 }
 
 @Composable
 fun TopBarMenu() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Person, contentDescription = "Profil", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "KasirKu",
-                color = DarkText,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Icon(
-            imageVector = Icons.Outlined.Notifications,
-            contentDescription = "Notifikasi",
-            tint = DarkText,
-            modifier = Modifier.size(24.dp)
-        )
-    }
+    // Deprecated in favor of Scaffold TopBar
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -184,7 +229,7 @@ fun CategoryChip(title: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun MenuCardItem(menu: MenuData) {
+fun MenuCardItem(menu: Menu, categoryName: String, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -192,14 +237,12 @@ fun MenuCardItem(menu: MenuData) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
-            // Placeholder untuk Gambar (Karena saat ini pakai Dummy)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
-                    .background(Color(0xFFE2E8F0)) // Warna abu-abu placeholder gambar
+                    .background(Color(0xFFE2E8F0))
             ) {
-                // Ikon makanan di tengah sebagai placeholder
                 Icon(
                     imageVector = Icons.Outlined.Restaurant,
                     contentDescription = null,
@@ -207,14 +250,13 @@ fun MenuCardItem(menu: MenuData) {
                     modifier = Modifier.align(Alignment.Center).size(48.dp)
                 )
 
-                // Badge Kategori di pojok kiri atas gambar
                 Surface(
                     color = Color.White.copy(alpha = 0.9f),
                     shape = RoundedCornerShape(4.dp),
                     modifier = Modifier.padding(12.dp)
                 ) {
                     Text(
-                        text = menu.kategori,
+                        text = categoryName,
                         color = PurplePrimary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -223,7 +265,6 @@ fun MenuCardItem(menu: MenuData) {
                 }
             }
 
-            // Bagian Teks & Aksi
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -231,7 +272,7 @@ fun MenuCardItem(menu: MenuData) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = menu.nama,
+                        text = menu.name,
                         color = DarkText,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
@@ -241,27 +282,27 @@ fun MenuCardItem(menu: MenuData) {
                             imageVector = Icons.Outlined.Edit,
                             contentDescription = "Edit",
                             tint = DarkText,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp).clickable { onEditClick() }
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Icon(
                             imageVector = Icons.Outlined.DeleteOutline,
                             contentDescription = "Hapus",
                             tint = DarkText,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp).clickable { onDeleteClick() }
                         )
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = menu.deskripsi,
+                    text = menu.description ?: "",
                     color = TextGray,
                     fontSize = 13.sp,
                     lineHeight = 18.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Rp ${NumberFormat.getNumberInstance(Locale("id", "ID")).format(menu.harga)}",
+                    text = "Rp ${NumberFormat.getNumberInstance(Locale("id", "ID")).format(menu.price)}",
                     color = PurplePrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
@@ -271,52 +312,71 @@ fun MenuCardItem(menu: MenuData) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KelolaBottomNav(navController: NavController) {
-    NavigationBar(
-        containerColor = Color.White,
-        tonalElevation = 8.dp
-    ) {
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.GridView, contentDescription = "Beranda") },
-            label = { Text("Beranda") },
-            selected = false,
-            onClick = { navController.navigate("dashboard") },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextGray,
-                unselectedTextColor = TextGray
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Filled.Inventory2, contentDescription = "Kelola") },
-            label = { Text("Kelola", fontWeight = FontWeight.Bold) },
-            selected = true,
-            onClick = { /* Sudah di halaman ini */ },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = PurplePrimary,
-                selectedTextColor = PurplePrimary,
-                indicatorColor = Color(0xFFEFE9FA) // Latar belakang pil ungu muda
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Assessment, contentDescription = "Laporan") },
-            label = { Text("Laporan") },
-            selected = false,
-            onClick = { navController.navigate("laporan") },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextGray,
-                unselectedTextColor = TextGray
-            )
-        )
-        NavigationBarItem(
-            icon = { Icon(Icons.Outlined.Person, contentDescription = "Profil") },
-            label = { Text("Profil") },
-            selected = false,
-            onClick = { navController.navigate("profil") },
-            colors = NavigationBarItemDefaults.colors(
-                unselectedIconColor = TextGray,
-                unselectedTextColor = TextGray
-            )
-        )
-    }
+fun FormMenuDialog(
+    menu: Menu?,
+    categories: List<com.example.tr.data.remote.model.Category>,
+    onDismiss: () -> Unit,
+    onSave: (String, String?, Double, Boolean, Long?) -> Unit
+) {
+    var name by remember { mutableStateOf(menu?.name ?: "") }
+    var description by remember { mutableStateOf(menu?.description ?: "") }
+    var price by remember { mutableStateOf(menu?.price?.toString() ?: "") }
+    var isAvailable by remember { mutableStateOf(menu?.isAvailable ?: true) }
+    var categoryId by remember { mutableStateOf(menu?.categoryId) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (menu == null) "Tambah Menu" else "Edit Menu") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") })
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Deskripsi") })
+                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Harga") })
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = isAvailable, onCheckedChange = { isAvailable = it })
+                    Text("Tersedia")
+                }
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedTextField(
+                        value = categories.find { it.id == categoryId }?.name ?: "Pilih Kategori",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Kategori") },
+                        trailingIcon = {
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    categoryId = category.id
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(name, description, price.toDoubleOrNull() ?: 0.0, isAvailable, categoryId) }) {
+                Text("Simpan")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Batal") }
+        }
+    )
 }

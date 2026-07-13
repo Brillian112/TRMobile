@@ -1,6 +1,5 @@
 package com.example.tr.uitr.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,127 +21,148 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.tr.data.dummy.DummyDataSource
-import com.example.tr.data.model.KaryawanData
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.tr.data.remote.model.User
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.example.tr.uitr.components.AppDrawer
+import com.example.tr.uitr.components.StatusBadge
+import com.example.tr.uitr.navigation.Screen
+import com.example.tr.uitr.viewmodel.KaryawanViewModel
 import com.example.tr.ui.theme.BgLight
 import com.example.tr.ui.theme.DarkText
 import com.example.tr.ui.theme.PrimaryBlue
 import com.example.tr.ui.theme.PurplePrimary
 import com.example.tr.ui.theme.TextGray
-import java.util.UUID
-
-// Menggunakan warna yang sama dari layar menu
-
+import com.example.tr.ui.theme.DarkNavy
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KelolaKaryawanScreen(navController: NavController) {
-    // STATE MANAGEMENT LOKAL (Agar fungsi tambah, edit, hapus berfungsi)
-    val karyawanList = remember { mutableStateListOf(*DummyDataSource.dummyKaryawanList.toTypedArray()) }
+fun KelolaKaryawanScreen(navController: NavController, viewModel: KaryawanViewModel = viewModel()) {
+    // STATE MANAGEMENT DARI VIEWMODEL
+    val karyawanList = viewModel.employees
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Semua") }
-    val categories = listOf("Semua", "Aktif", "Nonaktif")
+    val categories = listOf("Semua", "Manager", "Employee")
 
     // State untuk Dialog Tambah/Edit/Hapus
     var showFormDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var selectedKaryawan by remember { mutableStateOf<KaryawanData?>(null) }
+    var selectedKaryawan by remember { mutableStateOf<User?>(null) }
 
-    Scaffold(
-        containerColor = BgLight,
-        topBar = { TopBarKaryawan() },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    selectedKaryawan = null // Kosongkan state untuk Tambah baru
-                    showFormDialog = true
-                },
-                containerColor = PurplePrimary,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Tambah")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tambah Karyawan", fontWeight = FontWeight.Bold)
-                }
-            }
-        },
-        bottomBar = { KelolaBottomNav(navController) } // Gunakan BottomNav dari file sebelumnya
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
 
-            item {
-                Text(
-                    text = "Kelola Karyawan",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkText
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
+                navController = navController,
+                currentRoute = currentRoute,
+                onCloseDrawer = { scope.launch { drawerState.close() } }
+            )
+        }
+    ) {
+        Scaffold(
+            containerColor = BgLight,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Kelola Karyawan", fontWeight = FontWeight.Bold, color = DarkNavy) },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = DarkNavy)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BgLight)
                 )
-            }
-
-            // Search Bar
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Cari karyawan...", color = TextGray) },
-                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
-                    shape = RoundedCornerShape(12.dp),
-//                    colors = TextFieldDefaults.outlinedTextFieldColors(
-//                        containerColor = Color.White,
-//                        unfocusedBorderColor = Color(0xFFE2E8F0),
-//                        focusedBorderColor = PurplePrimary
-//                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // Filter Chips
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(categories) { category ->
-                        CategoryChip( // Gunakan komponen dari KelolaMenuScreen
-                            title = category,
-                            isSelected = category == selectedCategory,
-                            onClick = { selectedCategory = category }
-                        )
-                    }
-                }
-            }
-
-            // List Karyawan (Difilter berdasarkan kategori dan pencarian)
-            val filteredList = karyawanList.filter {
-                (selectedCategory == "Semua" || it.status == selectedCategory) &&
-                        it.nama.contains(searchQuery, ignoreCase = true)
-            }
-
-            items(filteredList) { karyawan ->
-                KaryawanCardItem(
-                    karyawan = karyawan,
-                    onEditClick = {
-                        selectedKaryawan = karyawan
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = {
+                        selectedKaryawan = null // Kosongkan state untuk Tambah baru
                         showFormDialog = true
                     },
-                    onDeleteClick = {
-                        selectedKaryawan = karyawan
-                        showDeleteDialog = true
+                    containerColor = PurplePrimary,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Tambah")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Tambah Karyawan", fontWeight = FontWeight.Bold)
                     }
-                )
+                }
             }
+        ) { paddingValues ->
+            if (viewModel.isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+                    // Search Bar
+                    item {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Cari karyawan...", color = TextGray) },
+                            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = TextGray) },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // Filter Chips
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(categories) { category ->
+                                CategoryChip(
+                                    title = category,
+                                    isSelected = category == selectedCategory,
+                                    onClick = { selectedCategory = category }
+                                )
+                            }
+                        }
+                    }
+
+                    // List Karyawan (Difilter berdasarkan kategori dan pencarian)
+                    val filteredList = karyawanList.filter {
+                        (selectedCategory == "Semua" || it.role == selectedCategory) &&
+                                it.name.contains(searchQuery, ignoreCase = true)
+                    }
+
+                    items(filteredList) { karyawan ->
+                        KaryawanCardItem(
+                            karyawan = karyawan,
+                            onEditClick = {
+                                selectedKaryawan = karyawan
+                                showFormDialog = true
+                            },
+                            onDeleteClick = {
+                                selectedKaryawan = karyawan
+                                showDeleteDialog = true
+                            }
+                        )
+                    }
+
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
+                }
+            }
         }
     }
 
@@ -153,18 +173,15 @@ fun KelolaKaryawanScreen(navController: NavController) {
         FormKaryawanDialog(
             karyawan = selectedKaryawan,
             onDismiss = { showFormDialog = false },
-            onSave = { nama, peran, status ->
+            onSave = { nama, password, peran ->
                 if (selectedKaryawan == null) {
                     // Tambah Karyawan Baru
                     karyawanList.add(
                         KaryawanData(id = UUID.randomUUID().toString(), nama = nama, peran = peran, password = "password", status = status)
                     )
+                    viewModel.createEmployee(nama, password, peran)
                 } else {
-                    // Update Karyawan Lama
-                    val index = karyawanList.indexOfFirst { it.id == selectedKaryawan!!.id }
-                    if (index != -1) {
-                        karyawanList[index] = selectedKaryawan!!.copy(nama = nama, peran = peran, status = status)
-                    }
+                    viewModel.updateEmployee(selectedKaryawan!!.id, nama, password, peran)
                 }
                 showFormDialog = false
             }
@@ -176,11 +193,11 @@ fun KelolaKaryawanScreen(navController: NavController) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Konfirmasi Hapus") },
-            text = { Text("Apakah Anda yakin ingin menghapus karyawan ${selectedKaryawan?.nama}?") },
+            text = { Text("Apakah Anda yakin ingin menghapus karyawan ${selectedKaryawan?.name}?") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        karyawanList.removeIf { it.id == selectedKaryawan?.id }
+                        viewModel.deleteEmployee(selectedKaryawan!!.id)
                         showDeleteDialog = false
                     }
                 ) { Text("Hapus", color = Color.Red) }
@@ -194,39 +211,18 @@ fun KelolaKaryawanScreen(navController: NavController) {
 
 @Composable
 fun TopBarKaryawan() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Person, contentDescription = "Profil", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text("KasirKu", color = PurplePrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
-        Icon(Icons.Outlined.Notifications, contentDescription = "Notifikasi", tint = DarkText)
-    }
+    // Deprecated in favor of Scaffold TopBar
 }
 
 @Composable
 fun KaryawanCardItem(
-    karyawan: KaryawanData,
+    karyawan: User,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     // Generate warna avatar berdasarkan inisial (Contoh sederhana)
-    val avatarColor = if (karyawan.nama.startsWith("A", true)) Color(0xFFDCD6F7) else Color(0xFFD4B95E)
-    val avatarTextColor = if (karyawan.nama.startsWith("A", true)) PurplePrimary else Color.White
+    val avatarColor = if (karyawan.name.startsWith("A", true)) Color(0xFFDCD6F7) else Color(0xFFD4B95E)
+    val avatarTextColor = if (karyawan.name.startsWith("A", true)) PurplePrimary else Color.White
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -250,7 +246,7 @@ fun KaryawanCardItem(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = karyawan.nama.take(1).uppercase(),
+                            text = karyawan.name.take(1).uppercase(),
                             color = avatarTextColor,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
@@ -258,36 +254,13 @@ fun KaryawanCardItem(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text(karyawan.nama, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkText)
-                        Text(karyawan.peran, fontSize = 12.sp, color = TextGray)
+                        Text(karyawan.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                        Text(karyawan.role, fontSize = 12.sp, color = TextGray)
                     }
                 }
 
-                // Badge Status
-                val isAktif = karyawan.status == "Aktif"
-                Surface(
-                    color = if (isAktif) Color(0xFFE6F4EA) else Color(0xFFFCE8E6),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isAktif) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
-                            contentDescription = null,
-                            tint = if (isAktif) Color(0xFF1E8E3E) else Color(0xFFD93025),
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = karyawan.status,
-                            color = if (isAktif) Color(0xFF1E8E3E) else Color(0xFFD93025),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                // Badge Status (Berdasarkan role untuk demo)
+                StatusBadge(status = karyawan.role)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -326,13 +299,13 @@ fun KaryawanCardItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FormKaryawanDialog(
-    karyawan: KaryawanData?, // Jika null berarti "Tambah", jika ada isi berarti "Edit"
+    karyawan: User?, // Jika null berarti "Tambah", jika ada isi berarti "Edit"
     onDismiss: () -> Unit,
     onSave: (String, String, String) -> Unit
 ) {
-    var nama by remember { mutableStateOf(karyawan?.nama ?: "") }
-    var peran by remember { mutableStateOf(karyawan?.peran ?: "Kasir") }
-    var status by remember { mutableStateOf(karyawan?.status ?: "Aktif") }
+    var nama by remember { mutableStateOf(karyawan?.name ?: "") }
+    var password by remember { mutableStateOf("") }
+    var peran by remember { mutableStateOf(karyawan?.role ?: "Employee") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -346,26 +319,26 @@ fun FormKaryawanDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
-                    value = peran,
-                    onValueChange = { peran = it },
-                    label = { Text("Peran") },
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Kata Sandi") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                // Sederhana: Toggle Status menggunakan tombol
+                // Role Selection
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Status: ", modifier = Modifier.weight(1f))
-                    TextButton(onClick = { status = "Aktif" }, modifier = Modifier.weight(1f)) {
-                        Text("Aktif", color = if (status == "Aktif") PurplePrimary else Color.Gray)
+                    Text("Peran: ", modifier = Modifier.weight(1f))
+                    TextButton(onClick = { peran = "Manager" }, modifier = Modifier.weight(1f)) {
+                        Text("Manager", color = if (peran == "Manager") PurplePrimary else Color.Gray)
                     }
-                    TextButton(onClick = { status = "Nonaktif" }, modifier = Modifier.weight(1f)) {
-                        Text("Nonaktif", color = if (status == "Nonaktif") Color.Red else Color.Gray)
+                    TextButton(onClick = { peran = "Employee" }, modifier = Modifier.weight(1f)) {
+                        Text("Employee", color = if (peran == "Employee") PurplePrimary else Color.Gray)
                     }
                 }
             }
         },
         confirmButton = {
             Button(
-                onClick = { if (nama.isNotBlank()) onSave(nama, peran, status) },
+                onClick = { if (nama.isNotBlank() && (karyawan != null || password.isNotBlank())) onSave(nama, password, peran) },
                 colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
             ) { Text("Simpan") }
         },

@@ -32,10 +32,20 @@ import com.example.tr.uitr.screens.RiwayatTransaksiScreen
 import com.example.tr.uitr.screens.AbsensiScreen
 import com.example.tr.data.dummy.DummyDataSource
 import com.example.tr.uitr.screens.ProfilScreen
+import com.example.tr.uitr.screens.DaftarHadirScreen
+import com.example.tr.uitr.screens.InventoriScreen
+import com.example.tr.uitr.screens.KelolaKaryawanScreen
+import com.example.tr.uitr.screens.KelolaMenuScreen
+import com.example.tr.uitr.screens.RiwayatTransaksiScreen
+import com.example.tr.uitr.screens.ProfilScreen
+import com.example.tr.uitr.screens.LaporanScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // TokenManager dihapus sesuai permintaan
+        val startDestination = Screen.Login.route
+
         setContent {
             TRTheme {
                 val navController = rememberNavController()
@@ -108,6 +118,21 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             }
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    val navController = rememberNavController()
+
+                    NavHost(navController = navController, startDestination = startDestination) {
+                        composable(Screen.Login.route) {
+                            LoginScreen(navController)
+                        }
+                        composable(Screen.Dashboard.route) {
+                            DashboardScreen(navController)
+                        }
+                        composable(Screen.Menu.route) {
+                            KelolaMenuScreen(navController)
                         }
                     }
                 ) { paddingValues ->
@@ -178,6 +203,21 @@ class MainActivity : ComponentActivity() {
                             composable(Screen.Profil.route) {
                                 ProfilScreen(navController = navController)
                             }
+                        }
+                        composable(Screen.Transaksi.route) {
+                            RiwayatTransaksiScreen(navController)
+                        }
+                        composable(Screen.Presensi.route) {
+                            DaftarHadirScreen(navController)
+                        }
+                        composable(Screen.Inventori.route) {
+                            InventoriScreen(navController)
+                        }
+                        composable(Screen.Profil.route) {
+                            ProfilScreen(navController)
+                        }
+                        composable(Screen.Laporan.route) {
+                            LaporanScreen(navController)
                         }
                     }
                 }

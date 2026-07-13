@@ -1,11 +1,14 @@
 package com.example.tr.data.dummy
 
 import com.example.tr.data.model.DashboardData
+import com.example.tr.data.model.InventoriData
 import com.example.tr.data.model.KaryawanData
+import com.example.tr.data.model.KehadiranData
 import com.example.tr.data.model.MenuData
 import com.example.tr.data.model.TransactionDetail
 import com.example.tr.data.model.Transaksi
 import com.example.tr.data.model.AttendanceData
+import com.example.tr.data.model.TransaksiData
 
 object DummyDataSource {
     val dashboardData = DashboardData(
@@ -112,4 +115,25 @@ object DummyDataSource {
         AttendanceData(2, 1, "19 Okt 2023", "08:15", "17:00", "Terlambat"),
         AttendanceData(3, 1, "18 Okt 2023", "07:40", "17:10", "Hadir")
     )
+
+    val dummyTransaksiList = listOf(
+        TransaksiData("1", "#INV-1024", "Selesai", "Andi", 3, 125000L, "Hari Ini"),
+        TransaksiData("2", "#INV-1023", "Dibatalkan", "Andi", 1, 15000L, "Hari Ini"),
+        TransaksiData("3", "#INV-1022", "Selesai", "Siti", 5, 250000L, "Minggu Ini"),
+        TransaksiData("4", "#INV-1021", "Selesai", "Andi", 2, 80000L, "Bulan Ini")
+    )
+
+    //Data Dummy Absen
+    val dummyKehadiranList = listOf(
+        KehadiranData("1", "Andi", "08:00 WIB", "Hadir"),
+        KehadiranData("2", "Siti", "-", "Izin")
+    )
+
+    //Data Dummy Inventory
+    val dummyInventoriList = listOf(
+        InventoriData("1", "Beras", 15.0, "kg", "Cukup"),
+        InventoriData("2", "Kopi Arabika", 0.5, "kg", "Rendah"),
+        InventoriData("3", "Gula Pasir", 0.0, "kg", "Habis")
+    )
+
 }
