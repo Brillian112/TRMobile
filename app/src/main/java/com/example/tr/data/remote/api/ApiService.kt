@@ -5,7 +5,7 @@ import retrofit2.Response
 import retrofit2.http.*
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
-
+import okhttp3.ResponseBody
 
 
 interface ApiService {
@@ -55,14 +55,37 @@ interface ApiService {
     @GET("api/menu/{id}")
     suspend fun getMenuById(@Path("id") id: Long): SingleMenuResponse
 
-    @POST("api/menu")
-    suspend fun createMenu(@Body request: MenuRequest): SingleMenuResponse
+//    @POST("api/menu")
+//    suspend fun createMenu(@Body request: MenuRequest): SingleMenuResponse
+//
+//    @PUT("api/menu/{id}")
+//    suspend fun updateMenu(@Path("id") id: Long, @Body request: MenuRequest): SingleMenuResponse
 
+    @Multipart
+    @POST("api/menu")
+    suspend fun createMenuMultipart(
+        @Part("nama") nama: RequestBody,
+        @Part("dekripsi") dekripsi: RequestBody, // Sesuaikan typo dokumentasi: "dekripsi"
+        @Part("harga") harga: RequestBody,
+        @Part("kategori_id") kategoriId: RequestBody,
+        @Part gambar: MultipartBody.Part // File gambar wajib diisi
+    ): Response<ResponseBody>
+
+    @Multipart
     @PUT("api/menu/{id}")
-    suspend fun updateMenu(@Path("id") id: Long, @Body request: MenuRequest): SingleMenuResponse
+    suspend fun updateMenuMultipart(
+        @Path("id") id: Long,
+        @Part nama: MultipartBody.Part,
+        @Part dekripsi: MultipartBody.Part,
+        @Part harga: MultipartBody.Part,
+        @Part kategoriId: MultipartBody.Part,
+        @Part gambar: MultipartBody.Part // Wajib diisi MultipartBody.Part (tidak boleh null)
+    ): Response<ResponseBody>
 
     @DELETE("api/menu/{id}")
-    suspend fun deleteMenu(@Path("id") id: Long): Response<Unit>
+    suspend fun deleteMenu(
+        @Path("id") id: Long
+    ): Response<Unit>
 
     @GET("api/menu/{id}/check-stock")
     suspend fun checkStock(@Path("id") id: Long): Response<Unit>
@@ -88,7 +111,7 @@ interface ApiService {
         @Part name: MultipartBody.Part,
         @Part unit: MultipartBody.Part,
         @Part quantity: MultipartBody.Part,
-        @Part gambar: MultipartBody.Part // 🔴 Selalu kirim part ini (tidak boleh null)
+        @Part gambar: MultipartBody.Part
     ): SingleIngredientResponse
 
     @PUT("api/ingredients/{id}")

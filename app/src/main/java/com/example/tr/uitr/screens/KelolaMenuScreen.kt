@@ -1,5 +1,8 @@
 package com.example.tr.uitr.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,14 +19,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.tr.data.remote.model.Menu
-import com.example.tr.data.remote.model.MenuRequest
 import com.example.tr.uitr.viewmodel.MenuViewModel
 import com.example.tr.uitr.viewmodel.AuthViewModel
 import com.example.tr.ui.theme.BgLight
@@ -43,11 +48,17 @@ fun KelolaMenuScreen(
     viewModel: MenuViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
-    val userRole = authViewModel.user?.role ?: ""
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.fetchMenus()
         viewModel.fetchCategories()
+    }
+    LaunchedEffect(viewModel.errorMessage) {
+        viewModel.errorMessage?.let { error ->
+            android.widget.Toast.makeText(context, "Error: $error", android.widget.Toast.LENGTH_LONG).show()
+            viewModel.clearErrorMessage()
+        }
     }
 
     var searchQuery by remember { mutableStateOf("") }
@@ -70,9 +81,7 @@ fun KelolaMenuScreen(
         drawerContent = {
             AppDrawer(
                 navController = navController,
-
                 currentRoute = currentRoute,
-
                 onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }
@@ -125,8 +134,6 @@ fun KelolaMenuScreen(
                 ) {
                     item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                    // Header dihapus karena sudah ada di TopBar
-                    
                     // Search Bar
                     item {
                         OutlinedTextField(
@@ -167,12 +174,16 @@ fun KelolaMenuScreen(
                             val categoryName = menu.category?.name ?: apiCategories.find { it.id == menu.categoryId }?.name
                             categoryName == selectedCategoryName
                         }
-                        
                         matchesCategory && menu.name.contains(searchQuery, ignoreCase = true)
                     }
 
                     items(filteredList) { menu ->
-                        val categoryName = menu.category?.name ?: apiCategories.find { it.id == menu.categoryId }?.name ?: "No Category"
+                        // 1. Ambil nama kategori langsung dari objek relasi jika Laravel menyediakannya
+                        // 2. Jika tidak ada, cari di list dengan mengonversi ke String + memangkas spasi (trim) untuk keamanan penuh
+                        val categoryName = menu.category?.name
+                            ?: apiCategories.find { it.id.toString().trim() == menu.categoryId?.toString()?.trim() }?.name
+                            ?: "No Category"
+
                         MenuCardItem(
                             menu = menu,
                             categoryName = categoryName,
@@ -181,6 +192,7 @@ fun KelolaMenuScreen(
                                 showFormDialog = true
                             },
                             onDeleteClick = {
+
                                 viewModel.deleteMenu(menu.id)
                             }
                         )
@@ -197,22 +209,40 @@ fun KelolaMenuScreen(
             menu = selectedMenu,
             categories = viewModel.categories,
             onDismiss = { showFormDialog = false },
-            onSave = { name, description, price, isAvailable, categoryId ->
-                val request = MenuRequest(name, description, price, isAvailable, categoryId, null)
+            // Cari blok FormMenuDialog di KelolaMenuScreen.kt kamu dan sesuaikan bagian onSave:
+            onSave = { name, description, price, categoryId, imageUri ->
                 if (selectedMenu == null) {
-                    viewModel.createMenu(request)
+                    // Logika Create Menu
+                    if (imageUri == null) {
+                        android.widget.Toast.makeText(context, "Gambar wajib dipilih!", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        viewModel.createMenuMultipart(
+                            context = context,
+                            name = name,
+                            description = description,
+                            price = price,
+                            categoryId = categoryId,
+                            imageUri = imageUri
+                        )
+                        showFormDialog = false
+                    }
                 } else {
-                    viewModel.updateMenu(selectedMenu!!.id, request)
+                    // Logika Update Menu -> Ambil URL gambar lama dari objek selectedMenu!!
+                    viewModel.updateMenuMultipart(
+                        context = context,
+                        id = selectedMenu!!.id,
+                        name = name,
+                        description = description,
+                        price = price,
+                        categoryId = categoryId,
+                        imageUri = imageUri,
+                        existingImageUrl = selectedMenu!!.imageUrl // Teruskan gambar lama ke sini
+                    )
+                    showFormDialog = false
                 }
-                showFormDialog = false
             }
         )
     }
-}
-
-@Composable
-fun TopBarMenu() {
-    // Deprecated in favor of Scaffold TopBar
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -249,12 +279,21 @@ fun MenuCardItem(menu: Menu, categoryName: String, onEditClick: () -> Unit, onDe
                     .height(140.dp)
                     .background(Color(0xFFE2E8F0))
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Restaurant,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.align(Alignment.Center).size(48.dp)
-                )
+                if (!menu.imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = menu.imageUrl,
+                        contentDescription = menu.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Restaurant,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.align(Alignment.Center).size(48.dp)
+                    )
+                }
 
                 Surface(
                     color = Color.White.copy(alpha = 0.9f),
@@ -324,26 +363,50 @@ fun FormMenuDialog(
     menu: Menu?,
     categories: List<com.example.tr.data.remote.model.Category>,
     onDismiss: () -> Unit,
-    onSave: (String, String?, Double, Boolean, Long?) -> Unit
+    onSave: (name: String, description: String, price: Double, categoryId: Long, imageUri: Uri?) -> Unit
 ) {
     var name by remember { mutableStateOf(menu?.name ?: "") }
     var description by remember { mutableStateOf(menu?.description ?: "") }
     var price by remember { mutableStateOf(menu?.price?.toString() ?: "") }
-    var isAvailable by remember { mutableStateOf(menu?.isAvailable ?: true) }
     var categoryId by remember { mutableStateOf(menu?.categoryId) }
+
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (menu == null) "Tambah Menu" else "Edit Menu") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") })
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Deskripsi") })
-                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Harga") })
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isAvailable, onCheckedChange = { isAvailable = it })
-                    Text("Tersedia")
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Deskripsi") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Harga") }, modifier = Modifier.fillMaxWidth())
+
+                OutlinedCard(
+                    onClick = { galleryLauncher.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Filled.Image, contentDescription = null, tint = PurplePrimary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (selectedImageUri != null) "Gambar Terpilih ✓" else "Pilih Gambar Menu",
+                            color = if (selectedImageUri != null) Color(0xFF2E7D32) else DarkText,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
+
                 var expanded by remember { mutableStateOf(false) }
                 Box {
                     OutlinedTextField(
@@ -377,12 +440,26 @@ fun FormMenuDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(name, description, price.toDoubleOrNull() ?: 0.0, isAvailable, categoryId) }) {
+            Button(
+                onClick = {
+                    val finalCategoryId = categoryId ?: (categories.firstOrNull()?.id ?: 0L)
+                    onSave(
+                        name,
+                        description,
+                        price.toDoubleOrNull() ?: 0.0,
+                        finalCategoryId,
+                        selectedImageUri
+                    )
+                },
+                // Tombol Simpan hanya aktif jika input dasar telah terisi untuk memenuhi validasi API
+                enabled = name.isNotBlank() && description.isNotBlank() && price.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
+            ) {
                 Text("Simpan")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Batal") }
+            TextButton(onClick = onDismiss) { Text("Batal", color = TextGray) }
         }
     )
 }

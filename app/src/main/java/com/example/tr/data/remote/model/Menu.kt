@@ -8,11 +8,11 @@ data class Menu(
     val description: String?,
     val price: Double,
     @SerializedName("is_available") val isAvailable: Boolean?,
-    @SerializedName("category_id") val categoryId: Long?,
+    @SerializedName("kategori_id") val categoryId: Long?,
     @SerializedName("image_url") val imageUrl: String?,
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("updated_at") val updatedAt: String?,
-    val category: Category?
+    @SerializedName("kategori") val category: Category?
 )
 
 data class MenuRequest(
